@@ -303,7 +303,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       <div class="sum-row"><span>Subtotal</span><span id="c-sub">R$ 0,00</span></div>
       <div class="sum-row taxa hidden" id="c-taxa"><span>&#128661; Taxa</span><span>+ R$ 2,50</span></div>
       <div class="total-row"><span class="total-label">Total</span><span class="total-val" id="c-total">R$ 0,00</span></div>
-      <button class="big-btn" onclick="irCheckout()">Finalizar pedido &#8594;</button>
+      <div style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:12px"><button class="big-btn" style="margin-top:0" onclick="irCheckout()">Continuar</button><button style="padding:0 16px;border-radius:12px;background:var(--red);color:#fff;border:none;cursor:pointer;font-size:13px;font-weight:700;font-family:var(--font)" onclick="limparCarrinho()">Limpar</button></div>
     </div>
   </div>
 </div>
@@ -379,7 +379,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         <div class="resumo-total"><span style="font-size:13px;font-weight:600">Total</span><span class="resumo-total-val" id="co-total">R$ 0,00</span></div>
       </div>
     </div>
-    <div class="co-footer"><button class="big-btn" id="co-btn" onclick="enviarPedido()">&#128172; Enviar pedido pelo WhatsApp</button></div>
+    <div class="co-footer"><button class="big-btn" id="co-btn" onclick="enviarPedido()">FINALIZAR PEDIDO</button></div>
   </div>
 </div>
 
@@ -402,7 +402,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
         <div class="acard-h"><span>&#129489;</span><span class="acard-title">Dados do cliente</span></div>
         <div class="acard-body">
           <div class="field"><label>Nome *</label><input id="a-nome" type="text" placeholder="Nome do cliente"></div>
-          <div class="field"><label>Contato</label><input id="a-tel" type="tel" placeholder="(00) 00000-0000"></div>
+          <div class="field"><label>Contato</label><input id="a-tel" type="tel" placeholder="(00) 00000-0000" oninput="mascaraTel(this)"></div>
           <div class="field"><label>Data</label><input id="a-data" type="date"></div>
           <div class="row2">
             <div class="field"><label>Endereco</label><input id="a-end" type="text" placeholder="Rua, bairro"></div>
@@ -547,7 +547,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       <div id="ptab-dados">
         <div id="perfil-msg" class="auth-msg"></div>
         <div class="field"><label>Nome</label><input id="p-nome-edit" type="text" placeholder="Seu nome"></div>
-        <div class="field"><label>Telefone</label><input id="p-tel-edit" type="tel" placeholder="(00) 00000-0000"></div>
+        <div class="field"><label>Telefone</label><input id="p-tel-edit" type="tel" placeholder="(00) 00000-0000" oninput="mascaraTel(this)"></div>
         <div class="field"><label>CEP</label>
           <div style="display:flex;gap:8px;align-items:center">
             <input id="p-cep-edit" type="text" placeholder="00000-000" maxlength="9" style="flex:1" oninput="mascaraCep(this)" onblur="buscarCepPerfil()">
@@ -626,7 +626,14 @@ function mascaraCep(el){
   if(v.length>5)v=v.slice(0,5)+'-'+v.slice(5,8);
   el.value=v;
 }
-
+function mascaraTel(el){
+  let v=el.value.replace(/\D/g,'');
+  if(v.length>11)v=v.slice(0,11);
+  if(v.length>6)v='('+v.slice(0,2)+') '+v.slice(2,7)+'-'+v.slice(7);
+  else if(v.length>2)v='('+v.slice(0,2)+') '+v.slice(2);
+  else if(v.length>0)v='('+v;
+  el.value=v;
+}
 async function buscarCep(){
   const cep=document.getElementById('co-cep').value.replace(/\D/g,'');
   if(cep.length!==8)return;
@@ -992,6 +999,13 @@ function updSums(){
   document.getElementById('c-total').textContent='R$ '+fp(sub+taxa);
 }
 
+
+function limparCarrinho(){
+  if(!cart.itens.length)return;
+  if(!confirm('Esvaziar o carrinho?'))return;
+  cart.itens=[];
+  updCartBadge();renderCart();
+}
 function irCheckout(){
   if(!cart.itens.length){alert('Carrinho vazio!');return}
   fecharCart();
@@ -1114,16 +1128,21 @@ async function enviarPedido(){
 }
 
 /* ADMIN */
-function showAdmin(){
+async function showAdmin(){
   document.getElementById('screen-shop').classList.remove('active');
   document.getElementById('screen-admin').classList.add('active');
   document.getElementById('adm-ava').textContent=ini(perfil.nome);
   document.getElementById('adm-label').textContent=perfil.role==='admin'?'Admin':'Pedidos';
   const tabs=document.getElementById('adm-tabs');
-  tabs.innerHTML=`<button class="atab active" onclick="showAPage('pedido',this)">Novo Pedido</button><button class="atab" onclick="showAPage('relatorio',this)">Relatorio</button><button class="atab" onclick="showAPage('produtos',this)">Produtos</button><button class="atab" onclick="showAPage('usuarios',this)">Usuarios</button><button class="atab" onclick="voltarLoja()">Loja</button>`;
+  tabs.innerHTML='<button class="atab active" onclick="showAPage(\'pedido\',this)">Novo Pedido</button>'
+    +'<button class="atab" onclick="showAPage(\'relatorio\',this)">Relatorio</button>'
+    +'<button class="atab" onclick="showAPage(\'produtos\',this)">Produtos</button>'
+    +'<button class="atab" onclick="showAPage(\'usuarios\',this)">Usuarios</button>'
+    +'<button class="atab" onclick="voltarLoja()">Loja</button>';;
   document.getElementById('a-data').value=hoje();
+  if(!cats.length||!prods.length) await loadCatalog();
   if(!fCatAdm&&cats.length)fCatAdm=cats[0].id;
-  renderACpills();renderAGrid();
+  renderACpills();renderAGrid();renderCatSel();
   showAEl('ap-pedido');
 }
 function voltarLoja(){document.getElementById('screen-admin').classList.remove('active');document.getElementById('screen-shop').classList.add('active')}
