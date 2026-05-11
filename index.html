@@ -346,7 +346,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     <div class="sheet-header"><span class="sheet-title">Finalizar pedido</span><button class="close-btn" onclick="fecharCo()">&#10005;</button></div>
     <div class="co-body">
       <div class="field"><label>Nome <span style="color:var(--red)">*</span></label><input id="co-nome" required type="text" placeholder="Seu nome"></div>
-      <div class="field"><label>Contato <span style="color:var(--red)">*</span></label><input id="co-tel" required type="tel" placeholder="(00) 00000-0000"></div>
+      <div class="field"><label>Contato <span style="color:var(--red)">*</span></label><input id="co-tel" required type="tel" placeholder="(00) 00000-0000" oninput="mascaraTel(this)"></div>
       <div class="field"><label>Data</label><input id="co-data" type="date"></div>
       <div class="field">
         <label>CEP</label>
@@ -407,6 +407,12 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
           <div class="field"><label>Nome *</label><input id="a-nome" type="text" placeholder="Nome do cliente"></div>
           <div class="field"><label>Contato</label><input id="a-tel" type="tel" placeholder="(00) 00000-0000" oninput="mascaraTel(this)"></div>
           <div class="field"><label>Data</label><input id="a-data" type="date"></div>
+          <div class="field"><label>CEP</label>
+            <div style="display:flex;gap:8px;align-items:center">
+              <input id="a-cep" type="text" placeholder="00000-000" maxlength="9" style="flex:1" oninput="mascaraCep(this)" onblur="buscarCepAdmin()">
+              <div id="a-cep-spin" class="spin hidden" style="flex-shrink:0"></div>
+            </div>
+          </div>
           <div class="row2">
             <div class="field"><label>Endereco</label><input id="a-end" type="text" placeholder="Rua, bairro"></div>
             <div class="field"><label>Numero</label><input id="a-num" type="text" placeholder="No"></div>
@@ -475,7 +481,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     </div>
     <div id="r-stats" class="stats"></div>
     <div class="pg-grid" style="margin-bottom:12px">
-      <div class="acard-sm"><div style="font-size:12px;font-weight:700;margin-bottom:10px">Consolidado</div><div id="r-cons"></div></div>
+      <div class="acard-sm"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><span style="font-size:12px;font-weight:700">Consolidado</span><button class="btn btn-o btn-sm" onclick="imprimirConsolidado()">&#128424; Imprimir</button></div><div id="r-cons"></div></div>
       <div class="acard-sm"><div style="font-size:12px;font-weight:700;margin-bottom:10px">Pedidos do periodo</div><div id="r-peds"></div></div>
     </div>
     <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow)">
@@ -696,7 +702,20 @@ async function buscarCepPerfil(){
   spin.classList.add('hidden');
 }
 
-// ── PERFIL CLIENTE ──
+async function buscarCepAdmin(){
+  const cep=document.getElementById('a-cep').value.replace(/\D/g,'');
+  if(cep.length!==8)return;
+  const spin=document.getElementById('a-cep-spin');
+  spin.classList.remove('hidden');
+  try{
+    const r=await fetch('https://viacep.com.br/ws/'+cep+'/json/');
+    const d=await r.json();
+    if(d.erro){alert('CEP nao encontrado.');spin.classList.add('hidden');return}
+    document.getElementById('a-end').value=(d.logradouro||'')+', '+(d.bairro||'')+' - '+(d.localidade||'')+'/'+d.uf;
+    document.getElementById('a-num').focus();
+  }catch(e){alert('Erro ao buscar CEP.')}
+  spin.classList.add('hidden');
+}
 function abrirPerfil(){
   if(!perfil)return;
   // Preencher dados
@@ -1258,6 +1277,14 @@ async function enviarPedido(){
       const p=prods.find(x=>x.id===it.prodId);
       return{pedido_id:ped.id,produto_id:p.id,nome_produto:p.nome,peso_produto:p.peso||'',preco_unitario:p.preco,quantidade:it.qty,subtotal:p.preco*it.qty};
     }));
+    // Decrementar estoque
+    await Promise.all(itensCopy.map(it=>{
+      const p=prods.find(x=>x.id===it.prodId);
+      if(!p||p.estoque==null)return Promise.resolve();
+      const novo=Math.max(0,p.estoque-it.qty);
+      p.estoque=novo;
+      return sb.from('produtos').update({estoque:novo}).eq('id',p.id);
+    }));
     cart={itens:[],entrega:'Entrega'};updCartBadge();fecharCo();
   }catch(e){alert('Erro: '+e.message)}
   btn.disabled=false;btn.textContent='Enviar pedido';
@@ -1391,7 +1418,7 @@ function aCalcTot(){return aCalcSub()+(ap.entrega==='Entrega'?TAXA:0)}
 function aLimpar(){
   if(ap.itens.length&&!confirm('Limpar pedido?'))return;
   ap={itens:[],entrega:'Entrega'};
-  ['a-nome','a-tel','a-end','a-num','a-obs'].forEach(id=>document.getElementById(id).value='');
+  ['a-nome','a-tel','a-cep','a-end','a-num','a-obs'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('a-data').value=hoje();
   setAE('Entrega');renderAOrder();
 }
@@ -1417,6 +1444,14 @@ async function aSalvar(){
     await sb.from('itens_pedido').insert(ap.itens.map(it=>{
       const p=prods.find(x=>x.id===it.prodId);
       return{pedido_id:ped.id,produto_id:p.id,nome_produto:p.nome,peso_produto:p.peso||'',preco_unitario:p.preco,quantidade:it.qty,subtotal:p.preco*it.qty};
+    }));
+    // Decrementar estoque
+    await Promise.all(ap.itens.map(it=>{
+      const p=prods.find(x=>x.id===it.prodId);
+      if(!p||p.estoque==null)return Promise.resolve();
+      const novo=Math.max(0,p.estoque-it.qty);
+      p.estoque=novo;
+      return sb.from('produtos').update({estoque:novo}).eq('id',p.id);
     }));
     alert('Pedido salvo!');aLimpar();
   }catch(e){alert('Erro: '+e.message)}
@@ -1491,6 +1526,32 @@ function goRPage(p){
   rPage=Math.max(1,Math.min(total,p));
   renderRPage();renderRPag();
   document.getElementById('r-table').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+function imprimirConsolidado(){
+  const mapa={};
+  rCache.forEach(p=>(p.itens_pedido||[]).forEach(it=>{
+    if(!mapa[it.produto_id])mapa[it.produto_id]={nome:it.nome_produto,peso:it.peso_produto,qty:0};
+    mapa[it.produto_id].qty+=it.quantidade;
+  }));
+  const items=Object.values(mapa).sort((a,b)=>b.qty-a.qty);
+  if(!items.length){alert('Sem dados para imprimir.');return}
+  const linhas=items.map(it=>{
+    const n=it.peso?parseFloat(it.peso.replace(/[^0-9.]/g,'')):null;
+    const u=it.peso?it.peso.replace(/[0-9. ]/g,'').toLowerCase():'';
+    let kg='';
+    if(n&&u==='g')kg=' | '+(n*it.qty/1000).toFixed(2)+' kg';
+    else if(n&&u==='kg')kg=' | '+(n*it.qty).toFixed(2)+' kg';
+    return it.nome.padEnd(28)+it.qty.toString().padStart(4)+' un'+kg;
+  });
+  const dataFiltro=document.getElementById('r-data')?.value||hoje();
+  const cabecalho='=== CONSOLIDADO ===\nData: '+fd(dataFiltro)+'\nPedidos: '+rCache.length+'\n'+'-'.repeat(44);
+  const rodape='-'.repeat(44)+'\nTotal geral: '+items.reduce((s,i)=>s+i.qty,0)+' itens';
+  const txt=[cabecalho,...linhas,rodape].join('\n');
+  const w=window.open('','_blank','width=480,height=600');
+  if(!w)return;
+  w.document.write('<html><body style="font-family:monospace;font-size:13px;padding:16px;white-space:pre">'+txt.replace(/&/g,'&amp;').replace(/</g,'&lt;')+'<script>window.onload=()=>window.print()<\/script></body></html>');
+  w.document.close();
 }
 
 function exportRel(){
