@@ -264,7 +264,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     <div class="brand"><div class="logo">&#127807;</div><div class="brand-name">Hortifruti<span>Legumes e Verduras</span></div></div>
     <div class="topbar-right">
       <button class="icon-btn" id="theme-btn" onclick="toggleTheme()">&#127769;</button>
-      <button class="login-top" id="topbar-login" onclick="abrirAuth()">Entrar</button>
+      <button class="login-top" id="topbar-login" onclick="handleLoginBtn()">Entrar</button>
       <button class="cart-fab" onclick="abrirCart()">&#128722;<span class="cart-badge hidden" id="cart-badge">0</span></button>
     </div>
   </div>
@@ -772,15 +772,21 @@ async function loadProfile(uid,user){
     const pn=perfil.nome.split(' ')[0];
     document.getElementById('topbar-login').textContent=pn+' \u25BE';
     document.getElementById('hero-msg').textContent='Ola, '+pn+'! \u{1F44B}';
-    document.getElementById('topbar-login').onclick=()=>{
-      if(perfil.role==='admin'){
-        const ok=confirm('Ir para o painel Admin?\nOK = Admin | Cancelar = Minha conta');
-        if(ok)showAdmin();else abrirPerfil();
-      }else{abrirPerfil();}
-    };
+
   }catch(e){console.error('loadProfile:',e)}
 }
 
+
+function handleLoginBtn(){
+  if(perfil){
+    if(perfil.role==='admin'){
+      const ok=confirm('Ir para o painel Admin?\nOK = Admin | Cancelar = Minha conta');
+      if(ok)showAdmin();else abrirPerfil();
+    }else{abrirPerfil();}
+  }else{
+    abrirAuth();
+  }
+}
 function abrirAuth(){document.getElementById('auth-ov').classList.add('open')}
 function fecharAuth(){document.getElementById('auth-ov').classList.remove('open')}
 function fecharAuthOv(e){if(e.target===document.getElementById('auth-ov'))fecharAuth()}
