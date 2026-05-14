@@ -559,6 +559,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     <div class="acard-sm" style="margin-bottom:12px">
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
         <div><label>Cliente ou ID do pedido</label><input id="r-busca" type="text" placeholder="Nome ou ID..." style="width:180px" oninput="renderRel()"></div>
+        <div><label>Filtrar por</label><select id="r-campo" style="width:155px" onchange="renderRel()"><option value="entrega">Data de entrega</option><option value="pedido">Data do pedido</option></select></div>
         <div><label>Filtro</label><select id="r-tipo" style="width:150px" onchange="toggleRFiltro()"><option value="dia">Data unica</option><option value="periodo">Periodo</option></select></div>
         <div id="r-fdia"><label>Data</label><input id="r-data" type="date" style="width:155px" onchange="renderRel()"></div>
         <div id="r-fper" class="date-range hidden"><div><label>De</label><input id="r-de" type="date" style="width:145px" onchange="renderRel()"></div><div><label>Ate</label><input id="r-ate" type="date" style="width:145px" onchange="renderRel()"></div></div>
@@ -572,7 +573,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow)">
       <div style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:12px;font-weight:700">Historico</div>
       <div id="r-loading" class="loading"><div class="spin"></div> Carregando...</div>
-      <div class="twrap"><table class="tbl hidden" id="r-table"><thead><tr><th>ID Pedido</th><th>Cliente</th><th>Data</th><th>Status</th><th>Entrega</th><th>Pagamento</th><th style="text-align:right">Total</th><th></th></tr></thead><tbody id="r-tbody"></tbody></table></div>
+      <div class="twrap"><table class="tbl hidden" id="r-table"><thead><tr><th>ID Pedido</th><th>Cliente</th><th>Pedido em</th><th>Entrega</th><th>Status</th><th>Forma</th><th style="text-align:right">Total</th><th></th></tr></thead><tbody id="r-tbody"></tbody></table></div>
       <div class="pag" id="r-pag"></div>
     </div>
   </div>
@@ -1832,9 +1833,19 @@ function toggleRFiltro(){
 async function renderRel(){
   const busca=(document.getElementById('r-busca').value||'').toLowerCase();
   const tipo=document.getElementById('r-tipo').value;
+  const campo=document.getElementById('r-campo').value; // 'entrega' | 'pedido'
   let q=sb.from('pedidos').select('*,itens_pedido(*)').order('created_at',{ascending:false});
-  if(tipo==='dia'){const d=document.getElementById('r-data').value;if(d)q=q.eq('data_pedido',d)}
-  else{const de=document.getElementById('r-de').value,ate=document.getElementById('r-ate').value;if(de)q=q.gte('data_pedido',de);if(ate)q=q.lte('data_pedido',ate)}
+  if(tipo==='dia'){
+    const d=document.getElementById('r-data').value;
+    if(d){
+      if(campo==='pedido') q=q.gte('created_at',d+'T00:00:00').lte('created_at',d+'T23:59:59');
+      else q=q.eq('data_pedido',d);
+    }
+  }else{
+    const de=document.getElementById('r-de').value,ate=document.getElementById('r-ate').value;
+    if(campo==='pedido'){if(de)q=q.gte('created_at',de+'T00:00:00');if(ate)q=q.lte('created_at',ate+'T23:59:59');}
+    else{if(de)q=q.gte('data_pedido',de);if(ate)q=q.lte('data_pedido',ate);}
+  }
   const {data:peds}=await q;
   const lista=(peds||[]).filter(p=>!busca||p.cliente_nome.toLowerCase().includes(busca)||(p.codigo&&p.codigo.includes(busca)));
   rCache=lista;rTotal=lista.length;rPage=1;
@@ -1852,7 +1863,8 @@ async function renderRel(){
   else{
     pedEl.innerHTML=lista.map(p=>{
       const its=(p.itens_pedido||[]).map(it=>it.quantidade+'x '+it.nome_produto).join(' / ');
-      const dataLabel=fdLabel(p.data_pedido)||fd(p.data_pedido);
+      const dataEntrega=fdLabel(p.data_pedido)||fd(p.data_pedido);
+      const dataPedido=p.created_at?new Date(p.created_at).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit'}):'';
       return`<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--border);gap:8px">
         <div style="flex:1;min-width:0">
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
@@ -1860,7 +1872,10 @@ async function renderRel(){
             ${p.codigo?`<span style="font-size:9px;font-weight:700;font-family:monospace;color:var(--text3)">${p.codigo}</span>`:''}
             ${p.taxa_entrega>0?'<span class="badge bg-orange" style="font-size:9px">Taxa</span>':''}
           </div>
-          <div style="font-size:10px;color:var(--text3);margin-top:1px">${dataLabel}</div>
+          <div style="font-size:10px;color:var(--text3);margin-top:2px;display:flex;gap:8px;flex-wrap:wrap">
+            ${dataPedido?`<span>📝 Pedido: ${dataPedido}</span>`:''}
+            ${dataEntrega?`<span>🚚 Entrega: ${dataEntrega}</span>`:''}
+          </div>
           <div style="font-size:11px;color:var(--text2);margin-top:2px">${its}</div>
         </div>
         <div style="font-weight:700;color:var(--green-bright);font-size:12px;white-space:nowrap">R$ ${fp(p.total)}</div>
@@ -1992,7 +2007,8 @@ function renderRPage(){
     return '<tr>'
       +'<td><span style="font-size:11px;font-weight:700;font-family:monospace;color:var(--text2)">'+(p.codigo||'-')+'</span></td>'
       +'<td><div style="font-weight:700;font-size:12px">'+p.cliente_nome+'</div><div style="font-size:10px;color:var(--text2)">'+(p.cliente_contato||'')+'</div></td>'
-      +'<td>'+fdLabel(p.data_pedido)+'</td>'
+      +'<td><div style="font-size:11px">'+( p.created_at?new Date(p.created_at).toLocaleDateString('pt-BR'):'-')+'</div></td>'
+      +'<td><div style="font-size:11px;font-weight:600">'+fdLabel(p.data_pedido)+'</div></td>'
       +'<td><select onchange="alterarStatus('+p.id+',this.value)" style="font-size:11px;padding:4px 6px;border-radius:6px;width:100%;min-width:120px">'+opts+'</select></td>'
       +'<td>'+(p.taxa_entrega>0?'<span class="badge bg-orange">Entrega</span>':'<span class="badge bg-gray">Retirada</span>')+'</td>'
       +'<td>'+p.pagamento+'</td>'
