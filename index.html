@@ -756,6 +756,19 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 </div>
 <div class="toast-wrap" id="toast-wrap"></div>
 
+<!-- MODAL DETALHE PEDIDO CLIENTE -->
+<div class="modal-ov" id="ped-det-modal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal-box" style="width:380px;max-height:85vh;overflow-y:auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px">
+      <div class="modal-title" id="ped-det-codigo">Pedido</div>
+      <button onclick="document.getElementById('ped-det-modal').classList.remove('open')" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--text2)">✕</button>
+    </div>
+    <div class="modal-sub" id="ped-det-status"></div>
+    <div id="ped-det-body" style="margin-bottom:14px"></div>
+    <div id="ped-det-btns"></div>
+  </div>
+</div>
+
 <!-- MODAL ESTOQUE -->
 <div class="modal-ov" id="est-modal" onclick="if(event.target===this)this.classList.remove('open')">
   <div class="modal-box">
@@ -997,18 +1010,72 @@ async function carregarHistoricoCliente(){
     const statusColor={'Pendente':'var(--orange)','Em preparo':'#3b82f6','Saiu para entrega':'#8b5cf6','Entregue':'var(--green-bright)','Cancelado':'var(--red)'}[p.status]||'var(--text2)';
     return`<div style="padding:12px 0;border-bottom:1px solid var(--border)">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
-        <div>
+        <div style="flex:1;min-width:0">
           <div style="font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.04em">Entrega</div>
           <div style="font-size:13px;font-weight:700">${fdLabel(p.data_pedido)}</div>
           <div style="font-size:11px;color:var(--text2);margin-top:2px">${its}</div>
         </div>
-        <div style="text-align:right;flex-shrink:0">
+        <div style="text-align:right;flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:6px">
           <div style="font-size:14px;font-weight:800;color:var(--green-bright)">R$ ${fp(p.total)}</div>
-          <div style="font-size:11px;font-weight:700;color:${statusColor};margin-top:2px">${p.status||'Pendente'}</div>
+          <div style="font-size:11px;font-weight:700;color:${statusColor}">${p.status||'Pendente'}</div>
+          <button class="btn btn-o btn-sm" onclick="verPedCliente(${p.id})">Ver</button>
         </div>
       </div>
     </div>`;
   }).join('');
+  // Cache dos pedidos do cliente para o modal
+  window._histCache=lista;
+}
+
+function verPedCliente(id){
+  const lista=window._histCache||[];
+  const p=lista.find(x=>x.id===id);if(!p)return;
+  const status=p.status||'Pendente';
+  const statusColor={'Pendente':'var(--orange)','Em preparo':'#3b82f6','Saiu para entrega':'#8b5cf6','Entregue':'var(--green-bright)','Cancelado':'var(--red)'}[status]||'var(--text2)';
+  const end=[p.cliente_endereco,p.cliente_numero].filter(Boolean).join(', no ');
+  // Monta corpo
+  const its=(p.itens_pedido||[]).map(it=>`
+    <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px">
+      <span>${it.quantidade}x ${it.nome_produto}${it.peso_produto?' ('+it.peso_produto+')':''}</span>
+      <span style="font-weight:700;color:var(--green-bright)">R$ ${fp(it.subtotal)}</span>
+    </div>`).join('');
+  const taxa=p.taxa_entrega>0?`<div style="display:flex;justify-content:space-between;padding:7px 0;font-size:12px;color:var(--orange)"><span>Taxa de entrega</span><span style="font-weight:700">R$ ${fp(p.taxa_entrega)}</span></div>`:'';
+  const total=`<div style="display:flex;justify-content:space-between;padding:9px 0;font-size:14px;font-weight:800;border-top:2px solid var(--border);margin-top:2px"><span>Total</span><span style="color:var(--green-bright)">R$ ${fp(p.total)}</span></div>`;
+  document.getElementById('ped-det-codigo').textContent='Pedido '+(p.codigo||'#'+p.id);
+  document.getElementById('ped-det-status').innerHTML=`<span style="font-weight:700;color:${statusColor}">${status}</span> · Entrega: ${fdLabel(p.data_pedido)}`;
+  document.getElementById('ped-det-body').innerHTML=`
+    <div style="font-size:11px;color:var(--text2);margin-bottom:10px">
+      ${end?`<div>📍 ${end}</div>`:''}
+      <div>💳 ${p.pagamento} · ${p.entrega==='Entrega'?'Entrega':'Retirada'}</div>
+      ${p.observacoes?`<div>📝 ${p.observacoes}</div>`:''}
+    </div>
+    <div>${its}${taxa}${total}</div>`;
+  // Botões conforme status
+  const btns=document.getElementById('ped-det-btns');
+  if(status==='Pendente'){
+    btns.innerHTML=`<button class="btn btn-r" style="width:100%;padding:11px" onclick="cancelarPedidoCliente(${id})">Cancelar pedido</button>`;
+  }else if(status==='Em preparo'){
+    btns.innerHTML=`<button class="btn btn-r" style="width:100%;padding:11px" onclick="solicitarCancelamento(${id},'${p.codigo||''}')">Solicitar cancelamento via WhatsApp</button>`;
+  }else{
+    btns.innerHTML='';
+  }
+  document.getElementById('ped-det-modal').classList.add('open');
+}
+
+async function cancelarPedidoCliente(id){
+  popConfirm('❌','Cancelar pedido?','Tem certeza que deseja cancelar este pedido?','Sim, cancelar','pbtn-danger',async()=>{
+    const {error}=await sb.from('pedidos').update({status:'Cancelado'}).eq('id',id);
+    if(error){toast('Erro ao cancelar.','err');return}
+    document.getElementById('ped-det-modal').classList.remove('open');
+    toast('Pedido cancelado.','ok');
+    carregarHistoricoCliente();
+  });
+}
+
+function solicitarCancelamento(id,codigo){
+  const num=codigo||('#'+id);
+  const msg=`Olá! Tudo bem?\n\nGostaria de solicitar o cancelamento do meu pedido, por favor.\nNúmero do pedido: ${num}.`;
+  window.open('https://wa.me/'+WHATSAPP_NUM+'?text='+encodeURIComponent(msg),'_blank');
 }
 
 
