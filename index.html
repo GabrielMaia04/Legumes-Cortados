@@ -565,8 +565,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       </div>
     </div>
     <div id="r-stats" class="stats"></div>
-    <div class="pg-grid" style="margin-bottom:12px">
-      <div class="acard-sm"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><span style="font-size:12px;font-weight:700">Consolidado</span><button class="btn btn-o btn-sm" onclick="imprimirConsolidado()">&#128424; Imprimir</button></div><div class="r-scroll-box"><div id="r-cons"></div></div></div>
+    <div style="margin-bottom:12px">
       <div class="acard-sm"><div style="font-size:12px;font-weight:700;margin-bottom:10px">Pedidos do periodo</div><div class="r-scroll-box"><div id="r-peds"></div></div></div>
     </div>
     <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow)">
@@ -645,10 +644,19 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       <div class="acard-sm" style="text-align:center"><div style="font-size:22px;font-weight:900;color:var(--orange)" id="e-tot-entr">-</div><div style="font-size:11px;color:var(--text2);margin-top:2px">Entregas</div></div>
       <div class="acard-sm" style="text-align:center"><div style="font-size:22px;font-weight:900;color:#3b82f6" id="e-tot-ret">-</div><div style="font-size:11px;color:var(--text2);margin-top:2px">Retiradas</div></div>
     </div>
-    <!-- Pedidos -->
-    <div class="acard-sm">
-      <div style="font-size:12px;font-weight:700;margin-bottom:10px">Pedidos do dia</div>
-      <div class="r-scroll-box"><div id="e-pedidos"></div></div>
+    <!-- Pedidos + Consolidado -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="acard-sm">
+        <div style="font-size:12px;font-weight:700;margin-bottom:10px">Pedidos do dia</div>
+        <div class="r-scroll-box"><div id="e-pedidos"></div></div>
+      </div>
+      <div class="acard-sm">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <span style="font-size:12px;font-weight:700">Consolidado</span>
+          <button class="btn btn-o btn-sm" onclick="imprimirEntregas()">🖨 Imprimir</button>
+        </div>
+        <div class="r-scroll-box"><div id="e-cons"></div></div>
+      </div>
     </div>
   </div>
 </div>
@@ -1832,7 +1840,7 @@ function aCopiar(){const o=aObj();if(!o.cliente_nome||!ap.itens.length){toast('C
 async function renderEntregas(){
   const data=document.getElementById('e-data').value;
   const pedEl=document.getElementById('e-pedidos');
-  if(!data){pedEl.innerHTML='<div class="empty">Selecione uma data acima.</div>';return}
+  if(!data){pedEl.innerHTML='<div class="empty">Selecione uma data acima.</div>';document.getElementById('e-cons').innerHTML='';return}
   pedEl.innerHTML='<div class="loading"><div class="spin"></div> Carregando...</div>';
   const {data:peds}=await sb.from('pedidos').select('*,itens_pedido(*)').eq('data_pedido',data).order('created_at',{ascending:true});
   const lista=peds||[];
@@ -1870,8 +1878,27 @@ async function renderEntregas(){
   if(entregas.length){html+=`<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--orange);margin-bottom:4px">🚚 Entregas (${entregas.length})</div>`;html+=entregas.map(cardPed).join('');}
   if(retiradas.length){if(entregas.length)html+=`<div style="margin-top:10px"></div>`;html+=`<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#3b82f6;margin-bottom:4px">🏪 Retiradas (${retiradas.length})</div>`;html+=retiradas.map(cardPed).join('');}
   pedEl.innerHTML=html;
+  // Consolidado
+  const consEl=document.getElementById('e-cons');
+  const mapa={};
+  lista.forEach(p=>(p.itens_pedido||[]).forEach(it=>{
+    const k=it.produto_id||it.nome_produto;
+    if(!mapa[k])mapa[k]={nome:it.nome_produto,peso:it.peso_produto,qty:0};
+    mapa[k].qty+=it.quantidade;
+  }));
+  const items=Object.values(mapa).sort((a,b)=>b.qty-a.qty);
+  consEl.innerHTML=items.map(it=>{
+    const n=it.peso?parseFloat(it.peso.replace(/[^0-9.]/g,'')):null;
+    const u=it.peso?it.peso.replace(/[0-9. ]/g,'').toLowerCase():'';
+    let kg='';
+    if(n&&u==='g')kg=` · ${(n*it.qty/1000).toFixed(2)}kg`;
+    else if(n&&u==='kg')kg=` · ${(n*it.qty).toFixed(2)}kg`;
+    return`<div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border)">
+      <div style="font-weight:700;font-size:12px">${it.nome}</div>
+      <div style="font-weight:700;color:var(--green-bright);font-size:12px">${it.qty} un${kg}</div>
+    </div>`;
+  }).join('') || '<div class="empty">Sem produtos.</div>';
 }
-async function alterarStatusE(id,status){await sb.from('pedidos').update({status}).eq('id',id);}
 function imprimirEntregas(){
   const data=document.getElementById('e-data').value;
   if(!data){toast('Selecione uma data primeiro.','err');return}
@@ -1881,6 +1908,7 @@ function imprimirEntregas(){
   w.document.write('<html><head>'+st+'</head><body>');
   w.document.write('<h2>ENTREGAS — '+label+'</h2><hr>');
   w.document.write('<h2>PEDIDOS</h2>'+document.getElementById('e-pedidos').innerHTML);
+  w.document.write('<hr><h2>CONSOLIDADO</h2>'+document.getElementById('e-cons').innerHTML);
   w.document.write('<script>window.onload=()=>window.print()<\/script></body></html>');
   w.document.close();
 }
@@ -1910,12 +1938,6 @@ async function renderRel(){
   const totG=lista.reduce((s,p)=>s+p.total,0);
   const totT=lista.reduce((s,p)=>s+(p.taxa_entrega||0),0);
   document.getElementById('r-stats').innerHTML=`<div class="scard"><div class="scard-l">Pedidos</div><div class="scard-v">${lista.length}</div></div><div class="scard"><div class="scard-l">Faturamento</div><div class="scard-v green">R$ ${fp(totG)}</div></div><div class="scard"><div class="scard-l">Ticket medio</div><div class="scard-v">R$ ${lista.length?fp(totG/lista.length):'0,00'}</div></div>`;
-  const mapa={};
-  lista.forEach(p=>(p.itens_pedido||[]).forEach(it=>{if(!mapa[it.produto_id])mapa[it.produto_id]={nome:it.nome_produto,peso:it.peso_produto,qty:0};mapa[it.produto_id].qty+=it.quantidade}));
-  const consEl=document.getElementById('r-cons');
-  const items=Object.values(mapa).sort((a,b)=>b.qty-a.qty);
-  if(!items.length){consEl.innerHTML='<div class="empty">Sem dados.</div>'}
-  else consEl.innerHTML=items.map(it=>{const n=it.peso?parseFloat(it.peso.replace(/[^0-9.]/g,'')):null;const u=it.peso?it.peso.replace(/[0-9. ]/g,'').toLowerCase():'';let pt='';if(n&&u==='g')pt=' · '+(n*it.qty/1000).toFixed(2)+'kg';else if(n&&u==='kg')pt=' · '+(n*it.qty).toFixed(2)+'kg';return`<div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border)"><div style="font-weight:700;font-size:12px">${it.nome}</div><div style="font-weight:700;color:var(--green-bright);font-size:12px">${it.qty} un${pt}</div></div>`}).join('');
   const pedEl=document.getElementById('r-peds');
   if(!lista.length){pedEl.innerHTML='<div class="empty">Sem pedidos.</div>'}
   else{
@@ -1969,31 +1991,6 @@ function goRPage(p){
   document.getElementById('r-table').scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 
-function imprimirConsolidado(){
-  const mapa={};
-  rCache.forEach(p=>(p.itens_pedido||[]).forEach(it=>{
-    if(!mapa[it.produto_id])mapa[it.produto_id]={nome:it.nome_produto,peso:it.peso_produto,qty:0};
-    mapa[it.produto_id].qty+=it.quantidade;
-  }));
-  const items=Object.values(mapa).sort((a,b)=>b.qty-a.qty);
-  if(!items.length){toast('Sem dados para imprimir.','err');return}
-  const linhas=items.map(it=>{
-    const n=it.peso?parseFloat(it.peso.replace(/[^0-9.]/g,'')):null;
-    const u=it.peso?it.peso.replace(/[0-9. ]/g,'').toLowerCase():'';
-    let kg='';
-    if(n&&u==='g')kg=' | '+(n*it.qty/1000).toFixed(2)+' kg';
-    else if(n&&u==='kg')kg=' | '+(n*it.qty).toFixed(2)+' kg';
-    return it.nome.padEnd(28)+it.qty.toString().padStart(4)+' un'+kg;
-  });
-  const dataFiltro=document.getElementById('r-data')?.value||hoje();
-  const cabecalho='=== CONSOLIDADO ===\nData: '+fd(dataFiltro)+'\nPedidos: '+rCache.length+'\n'+'-'.repeat(44);
-  const rodape='-'.repeat(44)+'\nTotal geral: '+items.reduce((s,i)=>s+i.qty,0)+' itens';
-  const txt=[cabecalho,...linhas,rodape].join('\n');
-  const w=window.open('','_blank','width=480,height=600');
-  if(!w)return;
-  w.document.write('<html><body style="font-family:monospace;font-size:13px;padding:16px;white-space:pre">'+txt.replace(/&/g,'&amp;').replace(/</g,'&lt;')+'<script>window.onload=()=>window.print()<\/script></body></html>');
-  w.document.close();
-}
 
 function exportRel(){
   if(!rCache.length){toast('Nenhum pedido para exportar.','err');return}
