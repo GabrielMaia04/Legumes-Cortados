@@ -559,7 +559,6 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     <div class="acard-sm" style="margin-bottom:12px">
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
         <div><label>Cliente ou ID do pedido</label><input id="r-busca" type="text" placeholder="Nome ou ID..." style="width:180px" oninput="renderRel()"></div>
-        <div><label>Filtrar por</label><select id="r-campo" style="width:155px" onchange="renderRel()"><option value="entrega">Data de entrega</option><option value="pedido">Data do pedido</option></select></div>
         <div><label>Filtro</label><select id="r-tipo" style="width:150px" onchange="toggleRFiltro()"><option value="dia">Data unica</option><option value="periodo">Periodo</option></select></div>
         <div id="r-fdia"><label>Data</label><input id="r-data" type="date" style="width:155px" onchange="renderRel()"></div>
         <div id="r-fper" class="date-range hidden"><div><label>De</label><input id="r-de" type="date" style="width:145px" onchange="renderRel()"></div><div><label>Ate</label><input id="r-ate" type="date" style="width:145px" onchange="renderRel()"></div></div>
@@ -633,10 +632,10 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     <!-- Filtro de data de entrega -->
     <div class="acard-sm" style="margin-bottom:12px">
       <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
-        <div><label>Data de entrega</label><input id="e-data" type="date" style="width:160px" onchange="renderEntregas()"></div>
-        <div style="display:flex;gap:6px">
-          <button class="btn btn-o btn-sm" onclick="setEData(proximoEntrega(2))">Próxima Terça</button>
-          <button class="btn btn-o btn-sm" onclick="setEData(proximoEntrega(6))">Próximo Sábado</button>
+        <div>
+          <label>Data de entrega</label>
+          <button type="button" class="cal-trigger" id="e-data-btn" onclick="abrirCal('entr')">Selecionar data de entrega</button>
+          <input type="hidden" id="e-data">
         </div>
       </div>
     </div>
@@ -1553,7 +1552,12 @@ function showAPage(p,tab){
   if(p==='relatorio')renderRel();
   if(p==='produtos'){renderCatList();renderProdList();renderCatSel();renderPPills()}
   if(p==='usuarios')renderUsers();
-  if(p==='entregas')renderEntregas();
+  if(p==='entregas'){
+    document.getElementById('e-data').value='';
+    const eb=document.getElementById('e-data-btn');
+    if(eb){eb.textContent='Selecionar data de entrega';eb.classList.remove('selected');}
+    renderEntregas();
+  }
 }
 function showAEl(id){document.querySelectorAll('.apage,.apage-3col').forEach(el=>el.classList.remove('active'));document.getElementById(id).classList.add('active')}
 
@@ -1598,8 +1602,7 @@ function abrirCal(ctx){
   calAno=hoje.getFullYear();calMes=hoje.getMonth();
   renderCal();
   document.getElementById('cal-ov').classList.add('open');
-}
-function fecharCal(){document.getElementById('cal-ov').classList.remove('open')}
+}function fecharCal(){document.getElementById('cal-ov').classList.remove('open')}
 function navCal(d){
   calMes+=d;
   if(calMes>11){calMes=0;calAno++}
@@ -1613,7 +1616,7 @@ function renderCal(){
   document.getElementById('cal-month-label').textContent=MESES_LONG[calMes]+' '+calAno;
 
   const hoje=new Date();hoje.setHours(0,0,0,0);
-  const selVal=document.getElementById(calCtx==='co'?'co-data':'a-data').value;
+  const selVal=document.getElementById(calCtx==='co'?'co-data':calCtx==='adm'?'a-data':'e-data').value;
 
   // Calcula as próximas 3 datas de entrega disponíveis
   const proximas=new Set();
@@ -1649,10 +1652,9 @@ function renderCal(){
 }
 
 function selecionarData(iso){
-  const idInput=calCtx==='co'?'co-data':'a-data';
-  const idBtn=calCtx==='co'?'co-data-btn':'a-data-btn';
+  const idInput=calCtx==='co'?'co-data':calCtx==='adm'?'a-data':'e-data';
+  const idBtn=calCtx==='co'?'co-data-btn':calCtx==='adm'?'a-data-btn':'e-data-btn';
   document.getElementById(idInput).value=iso;
-  // Atualiza o botão trigger com o label amigável
   const [y,m,d]=iso.split('-').map(Number);
   const dt=new Date(y,m-1,d);
   const label=DIAS_NOME_LONG[dt.getDay()]+', '+String(d).padStart(2,'0')+'/'+MESES[m-1];
@@ -1660,6 +1662,7 @@ function selecionarData(iso){
   btn.textContent=label;
   btn.classList.add('selected');
   fecharCal();
+  if(calCtx==='entr')renderEntregas();
 }
 
 function mostrarSucesso(){
@@ -1833,16 +1836,6 @@ function aImprimir(){const o=aObj();if(!o.cliente_nome||!ap.itens.length){toast(
 function aCopiar(){const o=aObj();if(!o.cliente_nome||!ap.itens.length){toast('Complete o pedido primeiro.','err');return}navigator.clipboard.writeText(bldTxt(o)).then(()=>toast('Copiado!','ok')).catch(()=>toast('Erro ao copiar.','err'))}
 
 /* ── ENTREGAS ── */
-function proximoEntrega(dow){
-  const d=new Date();d.setHours(0,0,0,0);
-  d.setDate(d.getDate()+1);
-  while(d.getDay()!==dow)d.setDate(d.getDate()+1);
-  return toISO(d);
-}
-function setEData(iso){
-  document.getElementById('e-data').value=iso;
-  renderEntregas();
-}
 async function renderEntregas(){
   const data=document.getElementById('e-data').value;
   const pedEl=document.getElementById('e-pedidos');
@@ -1921,19 +1914,9 @@ function toggleRFiltro(){
 async function renderRel(){
   const busca=(document.getElementById('r-busca').value||'').toLowerCase();
   const tipo=document.getElementById('r-tipo').value;
-  const campo=document.getElementById('r-campo').value; // 'entrega' | 'pedido'
   let q=sb.from('pedidos').select('*,itens_pedido(*)').order('created_at',{ascending:false});
-  if(tipo==='dia'){
-    const d=document.getElementById('r-data').value;
-    if(d){
-      if(campo==='pedido') q=q.gte('created_at',d+'T00:00:00').lte('created_at',d+'T23:59:59');
-      else q=q.eq('data_pedido',d);
-    }
-  }else{
-    const de=document.getElementById('r-de').value,ate=document.getElementById('r-ate').value;
-    if(campo==='pedido'){if(de)q=q.gte('created_at',de+'T00:00:00');if(ate)q=q.lte('created_at',ate+'T23:59:59');}
-    else{if(de)q=q.gte('data_pedido',de);if(ate)q=q.lte('data_pedido',ate);}
-  }
+  if(tipo==='dia'){const d=document.getElementById('r-data').value;if(d)q=q.eq('data_pedido',d)}
+  else{const de=document.getElementById('r-de').value,ate=document.getElementById('r-ate').value;if(de)q=q.gte('data_pedido',de);if(ate)q=q.lte('data_pedido',ate)}
   const {data:peds}=await q;
   const lista=(peds||[]).filter(p=>!busca||p.cliente_nome.toLowerCase().includes(busca)||(p.codigo&&p.codigo.includes(busca)));
   rCache=lista;rTotal=lista.length;rPage=1;
