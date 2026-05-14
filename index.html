@@ -615,10 +615,48 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 
   <!-- USUARIOS -->
   <div id="ap-usuarios" class="apage">
-    <div style="font-size:17px;font-weight:800;margin-bottom:12px">Usuarios</div>
     <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow)">
       <div id="u-loading" class="loading"><div class="spin"></div> Carregando...</div>
       <div class="twrap"><table class="tbl hidden" id="u-table"><thead><tr><th>Nome</th><th>Perfil</th><th>Cadastro</th><th>Acao</th></tr></thead><tbody id="u-tbody"></tbody></table></div>
+    </div>
+  </div>
+
+  <!-- ENTREGAS PAGE -->
+  <div id="ap-entregas" class="apage">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
+      <span style="font-size:17px;font-weight:800">Entregas</span>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-o btn-sm" onclick="renderEntregas()">↻ Atualizar</button>
+        <button class="btn btn-o btn-sm" onclick="imprimirEntregas()">🖨 Imprimir lista</button>
+      </div>
+    </div>
+    <!-- Filtro de data de entrega -->
+    <div class="acard-sm" style="margin-bottom:12px">
+      <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
+        <div><label>Data de entrega</label><input id="e-data" type="date" style="width:160px" onchange="renderEntregas()"></div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-o btn-sm" onclick="setEData(proximoEntrega(2))">Próxima Terça</button>
+          <button class="btn btn-o btn-sm" onclick="setEData(proximoEntrega(6))">Próximo Sábado</button>
+        </div>
+      </div>
+    </div>
+    <!-- Resumo -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:12px">
+      <div class="acard-sm" style="text-align:center"><div style="font-size:22px;font-weight:900;color:var(--green-bright)" id="e-tot-ped">-</div><div style="font-size:11px;color:var(--text2);margin-top:2px">Pedidos</div></div>
+      <div class="acard-sm" style="text-align:center"><div style="font-size:22px;font-weight:900;color:var(--orange)" id="e-tot-entr">-</div><div style="font-size:11px;color:var(--text2);margin-top:2px">Entregas</div></div>
+      <div class="acard-sm" style="text-align:center"><div style="font-size:22px;font-weight:900;color:#3b82f6" id="e-tot-ret">-</div><div style="font-size:11px;color:var(--text2);margin-top:2px">Retiradas</div></div>
+      <div class="acard-sm" style="text-align:center"><div style="font-size:22px;font-weight:900;color:var(--green-bright)" id="e-tot-val">-</div><div style="font-size:11px;color:var(--text2);margin-top:2px">Total R$</div></div>
+    </div>
+    <!-- Duas colunas: Pedidos | Consolidado -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="acard-sm">
+        <div style="font-size:12px;font-weight:700;margin-bottom:10px">Pedidos do dia</div>
+        <div class="r-scroll-box"><div id="e-pedidos"></div></div>
+      </div>
+      <div class="acard-sm">
+        <div style="font-size:12px;font-weight:700;margin-bottom:10px">Consolidado de produtos</div>
+        <div class="r-scroll-box"><div id="e-cons"></div></div>
+      </div>
     </div>
   </div>
 </div>
@@ -1530,6 +1568,7 @@ async function showAdmin(){
   const tabs=document.getElementById('adm-tabs');
   tabs.innerHTML='<button class="atab active" onclick="showAPage(\'pedido\',this)">Novo Pedido</button>'
     +'<button class="atab" onclick="showAPage(\'relatorio\',this)">Relatorio</button>'
+    +'<button class="atab" onclick="showAPage(\'entregas\',this)">Entregas</button>'
     +'<button class="atab" onclick="showAPage(\'produtos\',this)">Produtos</button>'
     +'<button class="atab" onclick="showAPage(\'usuarios\',this)">Usuarios</button>'
     +'<button class="atab" onclick="voltarLoja()">Loja</button>';;
@@ -1549,6 +1588,7 @@ function showAPage(p,tab){
   if(p==='relatorio')renderRel();
   if(p==='produtos'){renderCatList();renderProdList();renderCatSel();renderPPills()}
   if(p==='usuarios')renderUsers();
+  if(p==='entregas')renderEntregas();
 }
 function showAEl(id){document.querySelectorAll('.apage,.apage-3col').forEach(el=>el.classList.remove('active'));document.getElementById(id).classList.add('active')}
 
@@ -1823,6 +1863,85 @@ function aObj(){
 function aImprimir(){const o=aObj();if(!o.cliente_nome||!ap.itens.length){toast('Complete o pedido primeiro.','err');return}const w=window.open('','_blank','width=400,height=600');w.document.write('<html><body style="font-family:monospace;font-size:12px;width:72mm;margin:0 auto;padding:8px"><pre style="white-space:pre-wrap">'+bldTxt(o)+'<\/pre><script>window.onload=()=>window.print()<\/script><\/body><\/html>');w.document.close()}
 function aCopiar(){const o=aObj();if(!o.cliente_nome||!ap.itens.length){toast('Complete o pedido primeiro.','err');return}navigator.clipboard.writeText(bldTxt(o)).then(()=>toast('Copiado!','ok')).catch(()=>toast('Erro ao copiar.','err'))}
 
+/* ── ENTREGAS ── */
+function proximoEntrega(dow){
+  const d=new Date();d.setHours(0,0,0,0);
+  d.setDate(d.getDate()+1);
+  while(d.getDay()!==dow)d.setDate(d.getDate()+1);
+  return toISO(d);
+}
+function setEData(iso){
+  document.getElementById('e-data').value=iso;
+  renderEntregas();
+}
+async function renderEntregas(){
+  const data=document.getElementById('e-data').value;
+  const pedEl=document.getElementById('e-pedidos');
+  const consEl=document.getElementById('e-cons');
+  if(!data){
+    pedEl.innerHTML='<div class="empty">Selecione uma data acima.</div>';
+    consEl.innerHTML='<div class="empty">-</div>';
+    return;
+  }
+  pedEl.innerHTML='<div class="loading"><div class="spin"></div> Carregando...</div>';
+  const {data:peds}=await sb.from('pedidos').select('*,itens_pedido(*)').eq('data_pedido',data).order('created_at',{ascending:true});
+  const lista=peds||[];
+  document.getElementById('e-tot-ped').textContent=lista.length;
+  document.getElementById('e-tot-entr').textContent=lista.filter(p=>p.entrega==='Entrega').length;
+  document.getElementById('e-tot-ret').textContent=lista.filter(p=>p.entrega!=='Entrega').length;
+  document.getElementById('e-tot-val').textContent='R$ '+fp(lista.reduce((s,p)=>s+p.total,0));
+  if(!lista.length){
+    pedEl.innerHTML='<div class="empty">Nenhum pedido para esta data.</div>';
+    consEl.innerHTML='<div class="empty">-</div>';
+    return;
+  }
+  const entregas=lista.filter(p=>p.entrega==='Entrega');
+  const retiradas=lista.filter(p=>p.entrega!=='Entrega');
+  function cardPed(p){
+    const its=(p.itens_pedido||[]).map(it=>it.quantidade+'x '+it.nome_produto).join(', ');
+    const end=[p.cliente_endereco,p.cliente_numero].filter(Boolean).join(', no ');
+    return`<div style="padding:10px 0;border-bottom:1px solid var(--border)">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;font-size:12px">${p.cliente_nome}</div>
+          ${p.cliente_contato?`<div style="font-size:11px;color:var(--text2)">${p.cliente_contato}</div>`:''}
+          ${end?`<div style="font-size:11px;color:var(--text2)">${end}</div>`:''}
+          <div style="font-size:11px;color:var(--text2);margin-top:3px">${its}</div>
+          <div style="font-size:10px;color:var(--text3);margin-top:2px">Pgto: ${p.pagamento}${p.observacoes?' · '+p.observacoes:''}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-weight:800;font-size:13px;color:var(--green-bright)">R$ ${fp(p.total)}</div>
+          <select onchange="alterarStatusE(${p.id},this.value)" style="font-size:10px;padding:3px 5px;border-radius:6px;margin-top:4px;width:100%">
+            ${['Pendente','Em preparo','Saiu para entrega','Entregue','Cancelado'].map(s=>`<option value="${s}"${p.status===s?' selected':''}>${s}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+    </div>`;
+  }
+  let html='';
+  if(entregas.length){html+=`<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--orange);margin-bottom:4px">🚚 Entregas (${entregas.length})</div>`;html+=entregas.map(cardPed).join('');}
+  if(retiradas.length){if(entregas.length)html+=`<div style="margin-top:10px"></div>`;html+=`<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#3b82f6;margin-bottom:4px">🏪 Retiradas (${retiradas.length})</div>`;html+=retiradas.map(cardPed).join('');}
+  pedEl.innerHTML=html;
+  const mapa={};
+  lista.forEach(p=>(p.itens_pedido||[]).forEach(it=>{const k=it.produto_id||it.nome_produto;if(!mapa[k])mapa[k]={nome:it.nome_produto,peso:it.peso_produto,qty:0};mapa[k].qty+=it.quantidade;}));
+  const items=Object.values(mapa).sort((a,b)=>b.qty-a.qty);
+  consEl.innerHTML=items.map(it=>{const n=it.peso?parseFloat(it.peso.replace(/[^0-9.]/g,'')):null;const u=it.peso?it.peso.replace(/[0-9. ]/g,'').toLowerCase():'';let kg='';if(n&&u==='g')kg=` · ${(n*it.qty/1000).toFixed(2)}kg`;else if(n&&u==='kg')kg=` · ${(n*it.qty).toFixed(2)}kg`;return`<div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border)"><div style="font-weight:700;font-size:12px">${it.nome}</div><div style="font-weight:700;color:var(--green-bright);font-size:12px">${it.qty} un${kg}</div></div>`;}).join('');
+}
+async function alterarStatusE(id,status){await sb.from('pedidos').update({status}).eq('id',id);}
+function imprimirEntregas(){
+  const data=document.getElementById('e-data').value;
+  if(!data){toast('Selecione uma data primeiro.','err');return}
+  const label=fdLabel(data)||fd(data);
+  const w=window.open('','_blank','width=480,height=700');if(!w)return;
+  const st='<style>body{font-family:monospace;font-size:12px;padding:16px}h2{font-size:13px;margin:12px 0 4px}hr{border:none;border-top:1px solid #ccc;margin:6px 0}select{display:none}</style>';
+  w.document.write('<html><head>'+st+'</head><body>');
+  w.document.write('<h2>ENTREGAS — '+label+'</h2><hr>');
+  w.document.write('<h2>PEDIDOS</h2>'+document.getElementById('e-pedidos').innerHTML);
+  w.document.write('<hr><h2>CONSOLIDADO</h2>'+document.getElementById('e-cons').innerHTML);
+  w.document.write('<script>window.onload=()=>window.print()<\/script></body></html>');
+  w.document.close();
+}
+
 /* RELATORIO */
 function toggleRFiltro(){
   const t=document.getElementById('r-tipo').value;
@@ -1973,9 +2092,10 @@ function verPed(id){
   const txt=[
     'Cliente: '+p.cliente_nome,
     p.cliente_contato?'Contato: '+p.cliente_contato:'',
-    'Entrega: '+fd(p.data_pedido),
-    end?'Endereco: '+end:'',
-    'Entrega: '+p.entrega,
+    'Pedido em: '+(p.created_at?new Date(p.created_at).toLocaleDateString('pt-BR'):''),
+    'Entrega: '+fdLabel(p.data_pedido),
+    end?'Endereço: '+end:'',
+    p.entrega==='Entrega'?'Modalidade: Entrega':'Modalidade: Retirada',
     'Pagamento: '+p.pagamento,
     p.status?'Status: '+p.status:'',
     p.observacoes?'Obs: '+p.observacoes:'',
@@ -1985,7 +2105,36 @@ function verPed(id){
     p.taxa_entrega>0?'Taxa: R$ '+fp(p.taxa_entrega):'',
     'TOTAL: R$ '+fp(p.total)
   ].filter(Boolean).join('\n');
-  popAlert('📋','Pedido '+(p.codigo||'#'+p.id),txt);
+  popup('📋','Pedido '+(p.codigo||'#'+p.id),txt,[
+    {label:'Imprimir',cls:'pbtn-cancel',cb:()=>imprimirPedido(id)},
+    {label:'OK',cls:'pbtn-ok'}
+  ]);
+}
+function imprimirPedido(id){
+  const p=rCache.find(x=>x.id===id);if(!p)return;
+  const end=[p.cliente_endereco,p.cliente_numero].filter(Boolean).join(', no ');
+  const its=(p.itens_pedido||[]).map(it=>it.quantidade+'x '+it.nome_produto+(it.peso_produto?' ('+it.peso_produto+')':'')+'  R$ '+fp(it.subtotal)).join('\n');
+  const linhas=[
+    '=== PEDIDO '+(p.codigo||'#'+p.id)+' ===',
+    'Cliente: '+p.cliente_nome,
+    p.cliente_contato?'Contato: '+p.cliente_contato:'',
+    'Pedido em: '+(p.created_at?new Date(p.created_at).toLocaleDateString('pt-BR'):''),
+    'Entrega: '+fdLabel(p.data_pedido),
+    end?'Endereço: '+end:'',
+    p.entrega==='Entrega'?'Modalidade: Entrega':'Modalidade: Retirada',
+    'Pagamento: '+p.pagamento,
+    p.status?'Status: '+p.status:'',
+    p.observacoes?'Obs: '+p.observacoes:'',
+    '---',
+    its,
+    '---',
+    p.taxa_entrega>0?'Taxa: R$ '+fp(p.taxa_entrega):'',
+    'TOTAL: R$ '+fp(p.total)
+  ].filter(Boolean).join('\n');
+  const w=window.open('','_blank','width=400,height=600');
+  if(!w)return;
+  w.document.write('<html><body style="font-family:monospace;font-size:13px;width:72mm;margin:0 auto;padding:12px;white-space:pre-wrap">'+linhas.join('\n').replace(/&/g,'&amp;').replace(/</g,'&lt;')+'<script>window.onload=()=>window.print()<\/script></body></html>');
+  w.document.close();
 }
 
 async function alterarStatus(id,status){
