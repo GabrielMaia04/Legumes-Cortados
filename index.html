@@ -1911,6 +1911,7 @@ async function renderEntregas(){
   pedEl.innerHTML='<div class="loading"><div class="spin"></div> Carregando...</div>';
   const {data:peds}=await sb.from('pedidos').select('*,itens_pedido(*)').eq('data_pedido',data).order('created_at',{ascending:true});
   const lista=(peds||[]).filter(p=>p.status!=='Cancelado'&&p.status!=='Entregue');
+  window._entCache=lista;
   document.getElementById('e-tot-entr').textContent=lista.filter(p=>p.entrega==='Entrega').length;
   document.getElementById('e-tot-ret').textContent=lista.filter(p=>p.entrega!=='Entrega').length;
   if(!lista.length){
@@ -1973,14 +1974,58 @@ function imprimirEntregas(){
   const data=document.getElementById('e-data').value;
   if(!data){toast('Selecione uma data primeiro.','err');return}
   const label=fdLabel(data)||fd(data);
-  const pedHtml=document.getElementById('e-pedidos').innerHTML;
-  const consHtml=document.getElementById('e-cons').innerHTML;
-  const html=`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Entregas ${label}</title>
-  <style>body{font-family:Arial,sans-serif;font-size:12px;padding:16px;max-width:600px;margin:0 auto}h2{font-size:13px;margin:12px 0 4px}hr{border:none;border-top:1px solid #ccc;margin:8px 0}select{display:none}button{display:none}@media print{body{padding:8px}}</style>
-  </head><body>
-  <h2>ENTREGAS — ${label}</h2><hr>
-  <h2>PEDIDOS</h2>${pedHtml}
-  <hr><h2>CONSOLIDADO</h2>${consHtml}
+  const pedidos=window._entCache||[];
+  // Monta HTML térmico dos pedidos
+  const pedLines=pedidos.map(p=>{
+    const end=[p.cliente_endereco,p.cliente_numero].filter(Boolean).join(', no ');
+    const its=(p.itens_pedido||[]).map(it=>`<div class="row"><span>${it.quantidade}x ${it.nome_produto}</span><span>${it.quantidade}</span></div>`).join('');
+    return`<div style="margin-bottom:6px">
+      <div class="b">${p.cliente_nome}</div>
+      ${p.cliente_contato?`<div class="sm">${p.cliente_contato}</div>`:''}
+      ${end?`<div class="sm">${end}</div>`:''}
+      <div class="sm">${p.entrega==='Entrega'?'Entrega':'Retirada'} · ${p.pagamento} · R$ ${fp(p.total)}</div>
+      ${p.observacoes?`<div class="sm">Obs: ${p.observacoes}</div>`:''}
+      ${its}
+    </div><hr class="sep">`;
+  }).join('');
+  // Monta consolidado
+  const mapa={};
+  pedidos.forEach(p=>(p.itens_pedido||[]).forEach(it=>{
+    const k=it.produto_id||it.nome_produto;
+    if(!mapa[k])mapa[k]={nome:it.nome_produto,peso:it.peso_produto,qty:0};
+    mapa[k].qty+=it.quantidade;
+  }));
+  const consLines=Object.values(mapa).sort((a,b)=>b.qty-a.qty).map(it=>{
+    const n=it.peso?parseFloat(it.peso.replace(/[^0-9.]/g,'')):null;
+    const u=it.peso?it.peso.replace(/[0-9. ]/g,'').toLowerCase():'';
+    let kg='';if(n&&u==='g')kg=' / '+(n*it.qty/1000).toFixed(2)+'kg';else if(n&&u==='kg')kg=' / '+(n*it.qty).toFixed(2)+'kg';
+    return`<div class="row"><span>${it.nome}</span><span>${it.qty}un${kg}</span></div>`;
+  }).join('');
+  const html=`<!DOCTYPE html><html><head><meta charset="utf-8">
+  <style>@page{size:80mm auto;margin:2mm 4mm}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Courier New',Courier,monospace;font-size:11px;width:72mm;color:#000;line-height:1.45}
+    .c{text-align:center}
+    .b{font-weight:700}
+    .title{font-size:13px;font-weight:700;text-align:center;margin:2px 0}
+    .sep{border:none;border-top:1px dashed #000;margin:5px 0;width:100%}
+    .sep2{border:none;border-top:2px solid #000;margin:5px 0;width:100%}
+    .row{display:flex;justify-content:space-between;gap:4px;font-size:11px;padding:1px 0}
+    .row span:first-child{flex:1;word-break:break-word}
+    .row span:last-child{white-space:nowrap;font-weight:700;text-align:right;min-width:60px}
+    .total-row{display:flex;justify-content:space-between;font-size:13px;font-weight:700;padding:3px 0}
+    .info{font-size:10px;line-height:1.5;margin:3px 0}
+    .sm{font-size:10px;color:#333}
+    button,select{display:none!important}</style></head><body>
+  <div class="title">ENTREGAS</div>
+  <div class="c sm">${label}</div>
+  <div class="c sm">${pedidos.length} pedido(s)</div>
+  <hr class="sep2">
+  <div class="b" style="margin-bottom:4px">PEDIDOS</div>
+  ${pedLines}
+  <div class="b" style="margin:4px 0">CONSOLIDADO</div>
+  ${consLines}
+  <br><br>
   <script>window.onload=function(){window.print();}<\/script>
   </body></html>`;
   const blob=new Blob([html],{type:'text/html'});
@@ -2130,34 +2175,50 @@ function verPed(id){
 function imprimirPedido(id){
   const p=rCache.find(x=>x.id===id);if(!p)return;
   const end=[p.cliente_endereco,p.cliente_numero].filter(Boolean).join(', no ');
-  const its=(p.itens_pedido||[]).map(it=>
-    `<tr><td>${it.quantidade}x ${it.nome_produto}${it.peso_produto?' ('+it.peso_produto+')':''}</td><td style="text-align:right">R$ ${fp(it.subtotal)}</td></tr>`
-  ).join('');
-  const taxa=p.taxa_entrega>0?`<tr><td style="color:#e67e22">Taxa de entrega</td><td style="text-align:right;color:#e67e22">R$ ${fp(p.taxa_entrega)}</td></tr>`:'';
-  const html=`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Pedido ${p.codigo||'#'+p.id}</title>
-  <style>
-    body{font-family:Arial,sans-serif;font-size:13px;padding:20px;max-width:400px;margin:0 auto;color:#111}
-    h2{font-size:15px;margin:0 0 4px}
-    .sub{font-size:11px;color:#666;margin-bottom:14px}
-    .info{font-size:12px;margin-bottom:12px;line-height:1.7}
-    table{width:100%;border-collapse:collapse;margin-bottom:8px}
-    td{padding:5px 2px;border-bottom:1px solid #eee;font-size:12px}
-    .total td{font-size:14px;font-weight:700;border-top:2px solid #111;border-bottom:none;padding-top:8px}
-    @media print{body{padding:8px}}
-  </style></head><body>
-  <h2>Pedido ${p.codigo||'#'+p.id}</h2>
-  <div class="sub">Status: ${p.status||'Pendente'} · ${fdLabel(p.data_pedido)}</div>
+  const its=(p.itens_pedido||[]).map(it=>{
+    const sub='R$ '+fp(it.subtotal);
+    const nome=it.quantidade+'x '+it.nome_produto+(it.peso_produto?' ('+it.peso_produto+')':'');
+    return`<div class="row"><span>${nome}</span><span>${sub}</span></div>`;
+  }).join('');
+  const taxa=p.taxa_entrega>0?`<div class="row"><span>Taxa entrega</span><span>R$ ${fp(p.taxa_entrega)}</span></div>`:'';
+  const html=`<!DOCTYPE html><html><head><meta charset="utf-8">
+  <style>@page{size:80mm auto;margin:2mm 4mm}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Courier New',Courier,monospace;font-size:11px;width:72mm;color:#000;line-height:1.45}
+    .c{text-align:center}
+    .b{font-weight:700}
+    .title{font-size:13px;font-weight:700;text-align:center;margin:2px 0}
+    .sep{border:none;border-top:1px dashed #000;margin:5px 0;width:100%}
+    .sep2{border:none;border-top:2px solid #000;margin:5px 0;width:100%}
+    .row{display:flex;justify-content:space-between;gap:4px;font-size:11px;padding:1px 0}
+    .row span:first-child{flex:1;word-break:break-word}
+    .row span:last-child{white-space:nowrap;font-weight:700;text-align:right;min-width:60px}
+    .total-row{display:flex;justify-content:space-between;font-size:13px;font-weight:700;padding:3px 0}
+    .info{font-size:10px;line-height:1.5;margin:3px 0}
+    .sm{font-size:10px;color:#333}
+    button,select{display:none!important}</style></head><body>
+  <div class="title">PEDIDO ${p.codigo||'#'+p.id}</div>
+  <div class="c sm">${p.created_at?new Date(p.created_at).toLocaleString('pt-BR'):''}</div>
+  <hr class="sep">
   <div class="info">
-    <strong>${p.cliente_nome}</strong><br>
-    ${p.cliente_contato?p.cliente_contato+'<br>':''}
-    ${end?end+'<br>':''}
-    Pagamento: ${p.pagamento} · ${p.entrega==='Entrega'?'Entrega':'Retirada'}<br>
-    Pedido em: ${p.created_at?new Date(p.created_at).toLocaleString('pt-BR'):''}
+    <span class="b">${p.cliente_nome}</span>
+    ${p.cliente_contato?'<br>'+p.cliente_contato:''}
+    ${end?'<br>'+end:''}
+  </div>
+  <div class="info">
+    Entrega: ${fdLabel(p.data_pedido)}<br>
+    Modalidade: ${p.entrega==='Entrega'?'Entrega':'Retirada'}<br>
+    Pagamento: ${p.pagamento}<br>
+    Status: ${p.status||'Pendente'}
     ${p.observacoes?'<br>Obs: '+p.observacoes:''}
   </div>
-  <table>${its}${taxa}
-    <tr class="total"><td>TOTAL</td><td style="text-align:right;color:#27ae60">R$ ${fp(p.total)}</td></tr>
-  </table>
+  <hr class="sep">
+  ${its}${taxa}
+  <hr class="sep2">
+  <div class="total-row"><span>TOTAL</span><span>R$ ${fp(p.total)}</span></div>
+  <hr class="sep">
+  <div class="c sm" style="margin-top:4px">Obrigado pela preferencia!</div>
+  <br><br>
   <script>window.onload=function(){window.print();}<\/script>
   </body></html>`;
   const blob=new Blob([html],{type:'text/html'});
