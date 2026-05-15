@@ -2002,10 +2002,11 @@ function imprimirEntregas(){
     return`<div class="row"><span>${it.nome}</span><span>${it.qty}un${kg}</span></div>`;
   }).join('');
   const html=`<!DOCTYPE html><html><head><meta charset="utf-8">
-  <style>@page{size:80mm auto;margin:2mm 3mm}
+  <style>@page{size:80mm auto;margin:0}
     *{box-sizing:border-box;margin:0;padding:0}
-    html,body{width:72mm;max-width:72mm}
-    body{font-family:'Courier New',Courier,monospace;font-size:11px;color:#000;line-height:1.45}
+    html{width:80mm}
+    body{font-family:'Courier New',Courier,monospace;font-size:11px;color:#000;line-height:1.45;width:72mm;margin:0 auto;padding:3mm 0}
+    @media print{html,body{height:auto!important;overflow:visible!important}}
     .c{text-align:center}
     .b{font-weight:700}
     .title{font-size:13px;font-weight:700;text-align:center;margin:2px 0}
@@ -2026,7 +2027,6 @@ function imprimirEntregas(){
   ${pedLines}
   <div class="b" style="margin:4px 0">CONSOLIDADO</div>
   ${consLines}
-  <br><br>
   <script>window.onload=function(){window.print();}<\/script>
   </body></html>`;
   const blob=new Blob([html],{type:'text/html'});
@@ -2183,10 +2183,11 @@ function imprimirPedido(id){
   }).join('');
   const taxa=p.taxa_entrega>0?`<div class="row"><span>Taxa entrega</span><span>R$ ${fp(p.taxa_entrega)}</span></div>`:'';
   const html=`<!DOCTYPE html><html><head><meta charset="utf-8">
-  <style>@page{size:80mm auto;margin:2mm 3mm}
+  <style>@page{size:80mm auto;margin:0}
     *{box-sizing:border-box;margin:0;padding:0}
-    html,body{width:72mm;max-width:72mm}
-    body{font-family:'Courier New',Courier,monospace;font-size:11px;color:#000;line-height:1.45}
+    html{width:80mm}
+    body{font-family:'Courier New',Courier,monospace;font-size:11px;color:#000;line-height:1.45;width:72mm;margin:0 auto;padding:3mm 0}
+    @media print{html,body{height:auto!important;overflow:visible!important}}
     .c{text-align:center}
     .b{font-weight:700}
     .title{font-size:13px;font-weight:700;text-align:center;margin:2px 0}
@@ -2220,7 +2221,6 @@ function imprimirPedido(id){
   <div class="total-row"><span>TOTAL</span><span>R$ ${fp(p.total)}</span></div>
   <hr class="sep">
   <div class="c sm" style="margin-top:4px">Obrigado pela preferencia!</div>
-  <br><br>
   <script>window.onload=function(){window.print();}<\/script>
   </body></html>`;
   const blob=new Blob([html],{type:'text/html'});
