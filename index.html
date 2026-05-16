@@ -2035,7 +2035,7 @@ async function renderEntregas(){
   if(!data){pedEl.innerHTML='<div class="empty">Selecione uma data acima.</div>';document.getElementById('e-cons').innerHTML='';return}
   pedEl.innerHTML='<div class="loading"><div class="spin"></div> Carregando...</div>';
   const {data:peds}=await sb.from('pedidos').select('*,itens_pedido(*)').eq('data_pedido',data).order('created_at',{ascending:true});
-  const lista=(peds||[]).filter(p=>p.status!=='Cancelado'&&p.status!=='Entregue');
+  const lista=(peds||[]).filter(p=>p.status!=='Cancelado'&&p.status!=='Entregue'&&p.status!=='Pendente');
   window._entCache=lista;
   document.getElementById('e-tot-ped').textContent=lista.length;
   document.getElementById('e-tot-entr').textContent=lista.filter(p=>p.entrega==='Entrega').length;
@@ -2094,7 +2094,7 @@ async function renderEntregas(){
 }
 async function alterarStatusE(id,status){
   await sb.from('pedidos').update({status}).eq('id',id);
-  if(status==='Cancelado'||status==='Entregue') renderEntregas();
+  renderEntregas();
 }
 function imprimirTodosPedidos(){
   const lista=window._entCache||[];
