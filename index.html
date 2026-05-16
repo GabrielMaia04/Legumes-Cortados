@@ -2105,7 +2105,7 @@ function imprimirTodosPedidos(){
       const _sub=(p.itens_pedido||[]).reduce((s,it)=>s+it.subtotal,0);
     const _end=[p.cliente_endereco,p.cliente_numero].filter(Boolean).join(', n. ');
     const _comp=p.cliente_complemento||'';
-    const _pago=p.status==='Pendente'?'PIX — AGUARDANDO PGTO':p.status==='Em preparo'?'PGTO: NA ENTREGA':'PGTO: PAGO';
+    const _isPix=(p.pagamento||'').toLowerCase().includes('pix');const _pago=p.status==='Pendente'?'PIX — AGUARDANDO PGTO':_isPix?'PGTO: PAGO':'PGTO: NA ENTREGA';
     const _dt=p.created_at?new Date(p.created_at).toLocaleString('pt-BR'):'';
     const _taxa=p.taxa_entrega>0?'R$ '+fp(p.taxa_entrega):'R$ 0,00';
     const _its=(p.itens_pedido||[]).map(it=>`<div class="item-row"><span class="chk">[ ]</span><span class="in">${it.quantidade}x ${it.nome_produto}${it.peso_produto?' ('+it.peso_produto+')':''}</span><span class="iv">R$ ${fp(it.subtotal)}</span></div>`).join('');
@@ -2373,7 +2373,7 @@ function imprimirPedido(id){
   const _sub=(p.itens_pedido||[]).reduce((s,it)=>s+it.subtotal,0);
     const _end=[p.cliente_endereco,p.cliente_numero].filter(Boolean).join(', n. ');
     const _comp=p.cliente_complemento||'';
-    const _pago=p.status==='Pendente'?'PIX — AGUARDANDO PGTO':p.status==='Em preparo'?'PGTO: NA ENTREGA':'PGTO: PAGO';
+    const _isPix=(p.pagamento||'').toLowerCase().includes('pix');const _pago=p.status==='Pendente'?'PIX — AGUARDANDO PGTO':_isPix?'PGTO: PAGO':'PGTO: NA ENTREGA';
     const _dt=p.created_at?new Date(p.created_at).toLocaleString('pt-BR'):'';
     const _taxa=p.taxa_entrega>0?'R$ '+fp(p.taxa_entrega):'R$ 0,00';
     const _its=(p.itens_pedido||[]).map(it=>`<div class="item-row"><span class="chk">[ ]</span><span class="in">${it.quantidade}x ${it.nome_produto}${it.peso_produto?' ('+it.peso_produto+')':''}</span><span class="iv">R$ ${fp(it.subtotal)}</span></div>`).join('');
