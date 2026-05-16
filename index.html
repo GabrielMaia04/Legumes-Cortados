@@ -1686,9 +1686,19 @@ function renderCal(){
   const hoje=new Date();hoje.setHours(0,0,0,0);
   const selVal=document.getElementById(calCtx==='co'?'co-data':calCtx==='adm'?'a-data':'e-data').value;
 
-  // Calcula as próximas 3 datas de entrega disponíveis
+  // Datas disponíveis: lógica diferente por contexto
+  // Cliente/admin novo pedido: começa amanhã, 3 próximas
+  // Entregas admin: inclui hoje se for dia de entrega + próximas 3
   const proximas=new Set();
-  const d=new Date(hoje);d.setDate(d.getDate()+1);
+  const d=new Date(hoje);
+  if(calCtx==='entr'){
+    // Para entregas: começa hoje
+    if(d.getDay()===2||d.getDay()===6)proximas.add(toISO(d));
+    d.setDate(d.getDate()+1);
+  }else{
+    // Para clientes: começa amanhã
+    d.setDate(d.getDate()+1);
+  }
   while(proximas.size<3){
     if(d.getDay()===2||d.getDay()===6)proximas.add(toISO(d));
     d.setDate(d.getDate()+1);
@@ -1704,7 +1714,6 @@ function renderCal(){
     const dt=new Date(calAno,calMes,dia);
     const iso=toISO(dt);
     const isHoje=dt.getTime()===hoje.getTime();
-    const isPast=dt<=hoje;
     const isDisponivel=proximas.has(iso);
     const isSelected=iso===selVal;
 
