@@ -3410,17 +3410,22 @@ const LOCAIS_RETIRADA={
 
 /* ── MOBILE CART BAR ── */
 function updMobileCartBar(){
-  const bar=document.getElementById('mobile-cart-bar');
-  if(!bar)return;
-  const sub=cart.itens.reduce((s,it)=>{const p=prods.find(x=>x.id===it.prodId);return s+(p?p.preco*it.qty:0)},0);
+  // Mobile cart bar not needed in new layout (bottomnav handles it)
+  // Just update all badges
+}
+function updCartBadgeNew(){
   const tot=cart.itens.reduce((s,i)=>s+i.qty,0);
-  if(tot>0&&document.getElementById('screen-shop').classList.contains('active')){
-    bar.classList.add('show');
-    document.getElementById('mbar-total').textContent='R$ '+fp(sub);
-    document.getElementById('mbar-count').textContent=tot+' item'+(tot>1?'s':'');
-  }else{
-    bar.classList.remove('show');
-  }
+  ['cart-badge-desk','cart-badge-mob','cart-badge-mob2'].forEach(id=>{
+    const b=document.getElementById(id);
+    if(!b)return;
+    b.textContent=tot;
+    b.classList.toggle('hidden',tot===0);
+  });
+  // Mostra ícone carrinho na bottomnav quando tem itens
+  const bnc=document.getElementById('bn-carrinho');
+  if(bnc)bnc.style.display=tot>0?'flex':'none';
+  const nb=document.getElementById('cart-badge-mob');
+  if(nb){nb.textContent=tot;nb.classList.toggle('hidden',tot===0);}
 }
 
 /* ── DASHBOARD ── */
@@ -3530,12 +3535,7 @@ async function rmCupom(id){
 
 // init moved to load event
 
-// Inject mobile cart bar HTML
-document.body.insertAdjacentHTML('beforeend',`<div id="mobile-cart-bar" class="mobile-cart-bar">
-  <div><div id="mbar-total" style="font-size:16px;font-weight:800;color:var(--green-bright)">R$ 0,00</div>
-  <div id="mbar-count" style="font-size:11px;color:var(--text2)">0 items</div></div>
-  <button class="btn btn-g" style="padding:10px 20px;font-size:14px;font-weight:700" onclick="abrirCart()">Ver sacola ›</button>
-</div>`);
+<!-- bottomnav handles mobile cart -->
 </script>
 
 <!-- ESTOQUE MODAL -->
@@ -4031,8 +4031,206 @@ document.addEventListener('click',e=>{
   if(dd&&btn&&!btn.contains(e.target)&&!dd.contains(e.target))dd?.classList.add('hidden');
 });
 
-// ── OVERRIDE INIT ──
-const _origInit = init;
+// ── INIT ──
+async function init(){
+  // Carrega configurações do painel (taxa, redes, etc.)
+  await carregarConfiguracoes();
+
+  // Verifica sessão
+  const {data:{session}}=await sb.auth.getSession();
+  if(session?.user) await loadProfile(session.user.id, session.user);
+
+  // Carrega catálogo
+  await loadCatalog();
+
+  // Renderiza UI
+  renderHomeDestaque();
+  renderHomeKits();
+  renderCatTabs();
+  renderShopNew();
+  updCartBadgeNew();
+}
+
+async function loadCatalog(){
+  try{
+    const [c,p]=await Promise.all([
+      sb.from('categorias').select('*').order('nome'),
+      sb.from('produtos').select('*').order('nome')
+    ]);
+    cats=c.data||[];prods=p.data||[];
+  }catch(e){console.error('Erro catálogo:',e);}
+}
+
+async function loadProfile(uid,user){
+  try{
+    let {data}=await sb.from('profiles').select('*').eq('id',uid).single();
+    if(!data){
+      const nome=user?.user_metadata?.nome||user?.email?.split('@')[0]||'Usuario';
+      const {data:n,error}=await sb.from('profiles').insert({id:uid,nome,role:'cliente'}).select().single();
+      if(error)throw error;
+      data=n;
+    }
+    perfil=data;
+    // Atualiza UI
+    const btn=document.getElementById('tb-login-btn');
+    if(btn)btn.innerHTML='👤 '+perfil.nome.split(' ')[0];
+    const ddAdmin=document.getElementById('dd-admin');
+    if(ddAdmin)ddAdmin.style.display=perfil.role==='admin'?'flex':'none';
+    // Admin button no perfil
+    const adminBtn=document.getElementById('perfil-admin-btn');
+    if(adminBtn)adminBtn.style.display=perfil.role==='admin'?'block':'none';
+    if(window._coPend){window._coPend=false;navTo('checkout');}
+  }catch(e){console.error('loadProfile:',e);}
+}
+
+async function fazerLogin(){
+  const btn=document.getElementById('login-btn');
+  const msg=document.getElementById('login-msg');
+  const email=document.getElementById('login-email').value.trim();
+  const pass=document.getElementById('login-pass').value;
+  if(!email||!pass){showMsg(msg,'Preencha email e senha.','error');return}
+  btn.disabled=true;btn.textContent='Entrando...';
+  const {data,error}=await sb.auth.signInWithPassword({email,password:pass});
+  btn.disabled=false;btn.textContent='Entrar';
+  if(error){showMsg(msg,tErr(error.message),'error');return}
+  if(data?.user){
+    await loadProfile(data.user.id,data.user);
+    fecharAuth();
+    if(perfil?.role==='admin')showAdmin();
+    else if(window._coPend){window._coPend=false;navTo('checkout');}
+  }
+}
+
+async function fazerLogout(){
+  await sb.auth.signOut();
+  perfil=null;
+  const btn=document.getElementById('tb-login-btn');
+  if(btn)btn.innerHTML='👤';
+  document.getElementById('screen-admin')?.classList.remove('active');
+  document.getElementById('screen-shop')?.classList.add('active');
+  const ddAdmin=document.getElementById('dd-admin');
+  if(ddAdmin)ddAdmin.style.display='none';
+  fecharDropdown();
+  pararRealtime();
+  navTo('home');
+}
+
+function abrirCo(){
+  // Reset step
+  coStep=1;
+  renderDateChips();
+  renderCheckoutStep();
+  // Pre-fill se tiver perfil
+  if(perfil?.cep){
+    document.getElementById('co-cep').value=perfil.cep||'';
+    document.getElementById('co-rua').value=perfil.endereco||'';
+    document.getElementById('co-bairro').value=perfil.bairro||'';
+    document.getElementById('co-cidade').value=perfil.cidade||'';
+    document.getElementById('co-num').value=perfil.endereco_num||'';
+    document.getElementById('co-end').value=(perfil.endereco||'')+', '+(perfil.bairro||'')+' - '+(perfil.cidade||'');
+    document.getElementById('co-end-fields')?.classList.remove('hidden');
+  }
+  if(perfil?.nome)document.getElementById('co-nome').value=perfil.nome||'';
+  if(perfil?.telefone)document.getElementById('co-tel').value=perfil.telefone||'';
+  const tv=document.getElementById('co-taxa-val');if(tv)tv.textContent=fp(TAXA);
+  // Reset modalidade
+  cart.entrega='Entrega';
+  document.getElementById('co-de')?.classList.add('active');
+  document.getElementById('co-dr')?.classList.remove('active');
+  document.getElementById('co-endereco-bloco')?.classList.remove('hidden');
+  document.getElementById('co-retirada-bloco')?.classList.add('hidden');
+  // Reset pagamento
+  selecionarPag('pix');
+  updCoResumo();
+}
+
+function renderProdList(){
+  const el=document.getElementById('p-list');
+  if(!el)return;
+  const ps=fCatP?prods.filter(p=>p.cat_id===fCatP):prods;
+  if(!ps.length){el.innerHTML='<div class="empty">Nenhum produto.</div>';return}
+  el.innerHTML=ps.map(p=>{
+    const cat=cats.find(c=>c.id===p.cat_id);
+    const estoq=p.estoque!=null
+      ?'<span style="color:'+(p.estoque<=5?'var(--red)':'var(--text2)')+'">Est: '+p.estoque+'</span>'
+      :'<span style="color:var(--text3)">Ilimitado</span>';
+    return '<div class="prod-row">'
+      +'<div style="flex:1;min-width:0">'
+      +'<div style="font-size:12px;font-weight:700">'+(p.imagem_url?'🖼 ':( p.emoji||'🥦'))+' '+p.nome+' <span style="font-weight:400;color:var(--text2)">'+(p.peso?'('+p.peso+')':'')+'</span></div>'
+      +'<div style="font-size:10px;color:var(--text2)">'+(cat?cat.nome:'')+' · R$ '+fp(p.preco)+' · '+estoq+'</div>'
+      +'</div>'
+      +'<span class="badge '+(p.destaque?'bg-orange':'bg-gray')+'" style="cursor:pointer" onclick="togDestaque('+p.id+')">'+(p.destaque?'★ Destaque':'☆')+'</span>'
+      +'<span class="badge '+(p.ativo?'bg-green':'bg-gray')+'">'+(p.ativo?'Ativo':'Inativo')+'</span>'
+      +'<button class="btn btn-o btn-sm" onclick="abrirEditProd('+p.id+')" title="Editar">✏️</button>'
+      +'<button class="btn btn-o btn-sm" onclick="editEstoque('+p.id+')" title="Estoque">'+(p.estoque!=null?p.estoque:'∞')+'</button>'
+      +'<button class="btn btn-o btn-sm" onclick="togAtivo('+p.id+')">'+(p.ativo?'Off':'On')+'</button>'
+      +'<button class="btn btn-r btn-sm" onclick="rmProd('+p.id+')">x</button>'
+      +'</div>';
+  }).join('');
+}
+
+function abrirEditProd(id){
+  const p=prods.find(x=>x.id===id);if(!p)return;
+  document.getElementById('edit-prod-id').value=id;
+  document.getElementById('edit-prod-sub').textContent=(p.emoji||'🥦')+' Editando: '+p.nome;
+  document.getElementById('edit-p-nome').value=p.nome||'';
+  document.getElementById('edit-p-desc').value=p.descricao||'';
+  document.getElementById('edit-p-peso').value=p.peso||'';
+  document.getElementById('edit-p-preco').value=p.preco||'';
+  const bf=document.getElementById('edit-p-benefits');
+  if(bf)bf.value=p.benefits||'';
+  const df=document.getElementById('edit-p-destaque');
+  if(df)df.value=p.destaque?'true':'false';
+  document.getElementById('edit-prod-modal').classList.add('open');
+}
+
+async function salvarEditProd(){
+  const id=parseInt(document.getElementById('edit-prod-id').value);
+  const p=prods.find(x=>x.id===id);if(!p)return;
+  const nome=document.getElementById('edit-p-nome').value.trim();
+  const preco=parseFloat(document.getElementById('edit-p-preco').value);
+  if(!nome||isNaN(preco)){toast('Nome e preço são obrigatórios.','err');return}
+  const benefits=document.getElementById('edit-p-benefits')?.value||'';
+  const destaque=document.getElementById('edit-p-destaque')?.value==='true';
+  const upd={nome,descricao:document.getElementById('edit-p-desc').value.trim(),peso:document.getElementById('edit-p-peso').value.trim(),preco,benefits,destaque};
+  const {error}=await sb.from('produtos').update(upd).eq('id',id);
+  if(error){toast('Erro: '+error.message,'err');return}
+  Object.assign(p,upd);
+  document.getElementById('edit-prod-modal').classList.remove('open');
+  renderProdList();renderShopNew();renderHomeDestaque();
+  toast('Produto atualizado!','ok');
+}
+
+// Destaque toggle
+async function togDestaque(id){
+  const p=prods.find(x=>x.id===id);if(!p)return;
+  const novo=!p.destaque;
+  await sb.from('produtos').update({destaque:novo}).eq('id',id);
+  p.destaque=novo;
+  renderProdList();renderHomeDestaque();
+  toast(novo?'Produto em destaque!':'Removido do destaque','ok');
+}
+
+// Carrega configs do painel
+async function carregarConfiguracoes(){
+  try{
+    const {data}=await sb.from('configuracoes').select('chave,valor');
+    (data||[]).forEach(r=>{
+      if(r.chave==='taxa_entrega')TAXA=parseFloat(r.valor)||TAXA;
+      if(r.chave==='whatsapp_num')window._WHATSAPP_NUM_DB=r.valor;
+      if(r.chave==='instagram_url')INSTAGRAM_URL=r.valor;
+      if(r.chave==='wpp_msg_template')WPP_MSG_TEMPLATE=r.valor;
+      if(r.chave==='footer_horario'){const el=document.getElementById('footer-horario');if(el)el.textContent=r.valor;}
+      if(r.chave==='footer_regiao'){const el=document.getElementById('footer-regiao');if(el)el.textContent=r.valor;}
+      if(r.chave==='footer_pgto'){const el=document.getElementById('footer-pgto');if(el)el.textContent=r.valor;}
+    });
+  }catch(e){}
+}
+
+window.addEventListener('load',()=>init());
+</script>
+</body>
+</html>
 async function init(){
   await _origInit.call(this);
   // After catalog loaded, render new UI
