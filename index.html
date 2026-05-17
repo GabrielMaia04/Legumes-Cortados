@@ -398,9 +398,16 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     <div class="drawer-header"><span class="drawer-title">&#128722; Carrinho</span><button class="close-btn" onclick="fecharCart()">&#10005;</button></div>
     <div class="cart-list" id="cart-list"><div class="empty">Carrinho vazio</div></div>
     <div class="cart-footer">
+      <!-- Cupom -->
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <input id="cart-cupom-input" type="text" placeholder="Código do cupom" style="flex:1;font-size:13px;padding:8px 12px;text-transform:uppercase" oninput="this.value=this.value.toUpperCase()">
+        <button class="btn btn-o btn-sm" style="flex-shrink:0;padding:8px 12px" onclick="aplicarCupom()">Aplicar</button>
+      </div>
+      <div id="cart-cupom-msg" style="font-size:11px;margin-bottom:8px;display:none"></div>
       <div class="sum-row"><span>Itens</span><span id="c-itens">0</span></div>
       <div class="sum-row"><span>Subtotal</span><span id="c-sub">R$ 0,00</span></div>
-      <div class="sum-row taxa hidden" id="c-taxa"><span>&#128661; Taxa</span><span>+ R$ 2,50</span></div>
+      <div class="sum-row taxa hidden" id="c-taxa"><span>&#128661; Taxa</span><span id="c-taxa-val">+ R$ 2,50</span></div>
+      <div class="sum-row hidden" id="c-desc-row" style="color:var(--green-bright)"><span id="c-desc-label">Desconto</span><span id="c-desc-val" style="color:var(--green-bright)">- R$ 0,00</span></div>
       <div class="total-row"><span class="total-label">Total</span><span class="total-val" id="c-total">R$ 0,00</span></div>
       <div style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:12px"><button class="big-btn" style="margin-top:0" onclick="irCheckout()">Continuar</button><button style="padding:0 16px;border-radius:12px;background:var(--red);color:#fff;border:none;cursor:pointer;font-size:13px;font-weight:700;font-family:var(--font)" onclick="limparCarrinho()">Limpar</button></div>
     </div>
@@ -444,35 +451,48 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
     <div class="co-body">
       <div class="field"><label>Nome <span style="color:var(--red)">*</span></label><input id="co-nome" required type="text" placeholder="Seu nome"></div>
       <div class="field"><label>Contato <span style="color:var(--red)">*</span></label><input id="co-tel" required type="tel" placeholder="(00) 00000-0000" oninput="mascaraTel(this)"></div>
-      <div class="field"><label>Data de entrega</label>
-        <button type="button" class="cal-trigger" id="co-data-btn" onclick="abrirCal('co')">Selecionar data de entrega</button>
-        <input type="hidden" id="co-data">
-      </div>      <div class="field">
-        <label>CEP</label>
-        <div style="display:flex;gap:8px;align-items:center">
-          <input id="co-cep" type="text" placeholder="00000-000" maxlength="9" style="flex:1" oninput="mascaraCep(this)" onblur="buscarCep()">
-          <div id="co-cep-spin" class="spin hidden" style="flex-shrink:0"></div>
-        </div>
-      </div>
-      <div id="co-end-fields" class="hidden">
-        <div class="field"><label>Rua</label><input id="co-rua" type="text" placeholder="Preenchido pelo CEP" style="background:var(--bg4)" readonly></div>
-        <div class="row2">
-          <div class="field"><label>Bairro</label><input id="co-bairro" type="text" style="background:var(--bg4)" readonly></div>
-          <div class="field"><label>Cidade / UF</label><input id="co-cidade" type="text" style="background:var(--bg4)" readonly></div>
-        </div>
-        <div class="row2">
-          <div class="field"><label>Numero <span style="color:var(--red)">*</span></label><input id="co-num" type="text" placeholder="Ex: 123" required></div>
-          <div class="field"><label>Complemento</label><input id="co-comp" type="text" placeholder="Apto, bloco..."></div>
-        </div>
-      </div>
-      <input id="co-end" type="hidden">
+      <!-- Modalidade PRIMEIRO -->
       <div class="field">
-        <label>Entrega</label>
+        <label>Modalidade</label>
         <div class="dtog-wrap">
           <button class="dtog active" id="co-de" onclick="setCoE('Entrega')">Entrega</button>
           <button class="dtog" id="co-dr" onclick="setCoE('Retirada')">Retirada</button>
         </div>
-        <div id="co-taxa" class="taxa-badge">Taxa de entrega: R$ 2,50</div>
+      </div>
+      <!-- Data (depois da modalidade) -->
+      <div class="field"><label>Data</label>
+        <button type="button" class="cal-trigger" id="co-data-btn" onclick="abrirCal('co')">Selecionar data</button>
+        <input type="hidden" id="co-data">
+      </div>
+      <!-- ENDEREÇO (só Entrega) -->
+      <div id="co-endereco-bloco">
+        <div id="co-taxa" class="taxa-badge">&#128661; Taxa de entrega: R$ <span id="co-taxa-val">2,50</span></div>
+        <div class="field" style="margin-top:8px">
+          <label>CEP</label>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input id="co-cep" type="text" placeholder="00000-000" maxlength="9" style="flex:1" oninput="mascaraCep(this)" onblur="buscarCep()">
+            <div id="co-cep-spin" class="spin hidden" style="flex-shrink:0"></div>
+          </div>
+        </div>
+        <div id="co-end-fields" class="hidden">
+          <div class="field"><label>Rua</label><input id="co-rua" type="text" placeholder="Preenchido pelo CEP" style="background:var(--bg4)" readonly></div>
+          <div class="row2">
+            <div class="field"><label>Bairro</label><input id="co-bairro" type="text" style="background:var(--bg4)" readonly></div>
+            <div class="field"><label>Cidade / UF</label><input id="co-cidade" type="text" style="background:var(--bg4)" readonly></div>
+          </div>
+          <div class="row2">
+            <div class="field"><label>Numero <span style="color:var(--red)">*</span></label><input id="co-num" type="text" placeholder="Ex: 123" required></div>
+            <div class="field"><label>Complemento</label><input id="co-comp" type="text" placeholder="Apto, bloco..."></div>
+          </div>
+        </div>
+        <input id="co-end" type="hidden">
+      </div>
+      <!-- LOCAL RETIRADA (só Retirada) -->
+      <div id="co-retirada-bloco" class="hidden">
+        <div id="co-ret-info" style="background:var(--bg3);border:2px solid var(--green);border-radius:12px;padding:12px;margin-top:4px">
+          <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Selecione a data para ver o local de retirada</div>
+        </div>
+        <input type="hidden" id="co-ret-local">
       </div>
       <!-- PAGAMENTO -->
       <div class="field">
@@ -642,7 +662,14 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
       <div>
         <div class="acard-sm" style="margin-bottom:10px">
           <div style="font-size:12px;font-weight:700;margin-bottom:10px">Nova categoria</div>
-          <label>Nome</label><input id="cat-nome" type="text" placeholder="Ex: Legumes" style="margin-bottom:9px">
+          <div class="field"><label>Nome</label><input id="cat-nome" type="text" placeholder="Ex: Legumes"></div>
+          <div class="field"><label>Imagem (400x200px)</label>
+            <input id="cat-img-file" type="file" accept="image/*" style="display:none" onchange="previewCatImg(this)">
+            <div style="display:flex;gap:10px;align-items:center">
+              <div id="cat-img-preview" style="width:56px;height:28px;border-radius:8px;background:var(--bg4);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;overflow:hidden">🌿</div>
+              <button type="button" class="btn btn-o btn-sm" onclick="document.getElementById('cat-img-file').click()">Escolher foto</button>
+            </div>
+          </div>
           <button class="btn btn-g" style="width:100%" onclick="addCat()">+ Adicionar</button>
           <div id="cat-list" style="margin-top:10px"></div>
         </div>
@@ -655,7 +682,13 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
             <div class="field"><label>Peso</label><input id="p-peso" type="text" placeholder="350g"></div>
             <div class="field"><label>Preco (R$) *</label><input id="p-preco" type="number" step="0.01" placeholder="0,00"></div>
           </div>
-          <div class="field"><label>Emoji</label><input id="p-emoji" type="text" placeholder="&#129365;" style="font-size:22px;text-align:center"></div>
+          <div class="field"><label>Imagem do produto (800x800px)</label>
+            <input id="p-img-file" type="file" accept="image/*" style="display:none" onchange="previewProdImg(this)">
+            <div style="display:flex;gap:10px;align-items:center">
+              <div id="p-img-preview" style="width:56px;height:56px;border-radius:10px;background:var(--bg4);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0;overflow:hidden">🥦</div>
+              <button type="button" class="btn btn-o btn-sm" onclick="document.getElementById('p-img-file').click()">Escolher foto</button>
+            </div>
+          </div>
           <div class="field"><label>Estoque (deixe vazio = ilimitado)</label><input id="p-estoque" type="number" min="0" placeholder="Ex: 50"></div>
           <button class="btn btn-g" style="width:100%;margin-top:4px" onclick="addProd()">Salvar produto</button>
         </div>
@@ -1429,12 +1462,11 @@ function renderShopCats(){
   const todosIcon='\u{1F6D2}';
   const todosChip='<div class="cat-chip'+(fCatShop===null?' active':'')+'" onclick="setCatShop(null)"><div class="cat-icon">'+todosIcon+'</div><div class="cat-label">Todos</div></div>';
   document.getElementById('shop-cats').innerHTML=todosChip+cats.map(c=>{
-    const img=imgMap[c.nome];
-    const em=emojiMap[c.nome]||c.emoji||'\u{1F33F}';
-    const icone=img
-      ?'<img src="'+IMG_BASE+'/'+img+'" style="width:100%;height:100%;object-fit:contain;border-radius:10px;" onerror="this.parentNode.textContent=\''+em+'\'">'
+    const em=c.emoji||'\u{1F33F}';
+    const icone=c.imagem_url
+      ?`<img src="${c.imagem_url}" style="width:100%;height:100%;object-fit:cover;border-radius:10px" onerror="this.parentNode.textContent='${em}'">`
       :em;
-    const iconStyle=img?'padding:4px;overflow:hidden;':'';
+    const iconStyle=c.imagem_url?'padding:0;overflow:hidden;':'';
     return '<div class="cat-chip'+(fCatShop===c.id?' active':'')+'" onclick="setCatShop('+c.id+')">'
       +'<div class="cat-icon" style="'+iconStyle+'">'+icone+'</div>'
       +'<div class="cat-label">'+c.nome+'</div>'
@@ -1504,8 +1536,20 @@ function updCartBadge(){
   if(tot>0){b.textContent=tot;b.classList.remove('hidden')}else b.classList.add('hidden');
   updMobileCartBar();
 }
-function abrirCart(){renderCart();document.getElementById('cart-ov').classList.add('open');setTimeout(()=>document.getElementById('cart-drawer').classList.add('open'),10)}
-function fecharCart(){document.getElementById('cart-drawer').classList.remove('open');setTimeout(()=>document.getElementById('cart-ov').classList.remove('open'),300)}
+function abrirCart(){
+  renderCart();
+  document.getElementById('cart-ov').classList.add('open');
+  setTimeout(()=>document.getElementById('cart-drawer').classList.add('open'),10);
+  // Esconde barra mobile para não atrapalhar
+  const bar=document.getElementById('mobile-cart-bar');
+  if(bar)bar.classList.remove('show');
+}
+function fecharCart(){
+  document.getElementById('cart-drawer').classList.remove('open');
+  setTimeout(()=>document.getElementById('cart-ov').classList.remove('open'),300);
+  // Mostra barra novamente se tiver itens
+  updMobileCartBar();
+}
 function fecharCartOv(e){if(e.target===document.getElementById('cart-ov'))fecharCart()}
 
 function renderCart(){
@@ -1523,11 +1567,22 @@ function cQty(i,d){cart.itens[i].qty=Math.max(0,cart.itens[i].qty+d);if(cart.ite
 function updSums(){
   const sub=cart.itens.reduce((s,it)=>{const p=prods.find(x=>x.id===it.prodId);return s+(p?p.preco*it.qty:0)},0);
   const taxa=cart.entrega==='Entrega'?TAXA:0;
+  const desc=cupomAtivo?Math.round(sub*cupomAtivo.desconto/100*100)/100:0;
   const qtd=cart.itens.reduce((s,i)=>s+i.qty,0);
   document.getElementById('c-itens').textContent=qtd;
   document.getElementById('c-sub').textContent='R$ '+fp(sub);
   document.getElementById('c-taxa').classList.toggle('hidden',taxa===0);
-  document.getElementById('c-total').textContent='R$ '+fp(sub+taxa);
+  const taxaVal=document.getElementById('c-taxa-val');
+  if(taxaVal)taxaVal.textContent='+ R$ '+fp(taxa);
+  const descRow=document.getElementById('c-desc-row');
+  if(descRow){
+    descRow.classList.toggle('hidden',!cupomAtivo);
+    if(cupomAtivo){
+      document.getElementById('c-desc-label').textContent='Cupom '+cupomAtivo.nome+' ('+cupomAtivo.desconto+'%)';
+      document.getElementById('c-desc-val').textContent='- R$ '+fp(desc);
+    }
+  }
+  document.getElementById('c-total').textContent='R$ '+fp(sub+taxa-desc);
 }
 
 
@@ -1548,7 +1603,18 @@ function abrirCo(){
   document.getElementById('co-nome').value=perfil?.nome||'';
   document.getElementById('co-data').value='';
   const cob=document.getElementById('co-data-btn');
-  cob.textContent='Selecionar data de entrega';cob.classList.remove('selected');
+  if(cob){cob.textContent='Selecionar data';cob.classList.remove('selected');}
+  // Reset modalidade para Entrega
+  cart.entrega='Entrega';
+  document.getElementById('co-de').classList.add('active');
+  document.getElementById('co-dr').classList.remove('active');
+  const eb=document.getElementById('co-endereco-bloco');
+  const rb=document.getElementById('co-retirada-bloco');
+  if(eb)eb.classList.remove('hidden');
+  if(rb)rb.classList.add('hidden');
+  // Atualiza taxa dinamicamente
+  const tv=document.getElementById('co-taxa-val');
+  if(tv)tv.textContent=fp(TAXA);
   // Reset pagamento
   setPagMomento('agora');
   document.getElementById('co-pag').value='Pix';
@@ -1571,14 +1637,62 @@ function setCoE(v){
   cart.entrega=v;
   document.getElementById('co-de').classList.toggle('active',v==='Entrega');
   document.getElementById('co-dr').classList.toggle('active',v==='Retirada');
-  document.getElementById('co-taxa').style.display=v==='Entrega'?'inline-flex':'none';
+  document.getElementById('co-endereco-bloco').classList.toggle('hidden',v==='Retirada');
+  document.getElementById('co-retirada-bloco').classList.toggle('hidden',v!=='Retirada');
+  if(v==='Retirada') renderRetOpts();
   updSums();updCoResumo();
+}
+function renderRetOpts(){
+  const dataVal=document.getElementById('co-data').value;
+  const info=document.getElementById('co-ret-info');
+  if(!dataVal){
+    info.innerHTML='<div style="font-size:12px;color:var(--text3)">Selecione a data acima para ver o local de retirada.</div>';
+    document.getElementById('co-ret-local').value='';
+    return;
+  }
+  const [y,m,d]=dataVal.split('-').map(Number);
+  const dow=new Date(y,m-1,d).getDay();
+  const local=LOCAIS_RETIRADA[dow];
+  if(!local){
+    info.innerHTML='<div style="font-size:12px;color:var(--red)">Sem retirada disponível nesta data.</div>';
+    document.getElementById('co-ret-local').value='';
+    return;
+  }
+  document.getElementById('co-ret-local').value=local.end;
+  info.innerHTML=`
+    <div style="font-size:12px;font-weight:800;color:var(--green-bright);margin-bottom:4px">📍 ${local.nome}</div>
+    <div style="font-size:12px;color:var(--text)">${local.end}</div>
+    <div style="font-size:11px;color:var(--text2);margin-top:3px">${local.ref}</div>`;
+}
+let cupomAtivo=null;
+
+async function aplicarCupom(){
+  const nome=document.getElementById('cart-cupom-input').value.trim().toUpperCase();
+  const msg=document.getElementById('cart-cupom-msg');
+  if(!nome){msg.style.display='block';msg.style.color='var(--red)';msg.textContent='Digite o código do cupom.';return}
+  const {data:c,error}=await sb.from('cupons').select('*').eq('nome',nome).eq('ativo',true).single();
+  if(error||!c){
+    msg.style.display='block';msg.style.color='var(--red)';msg.textContent='Cupom inválido ou não encontrado.';return;
+  }
+  if(c.usos_restantes<=0){
+    msg.style.display='block';msg.style.color='var(--orange)';
+    msg.textContent='Esse cupom fez sucesso e já esgotou!';
+    return;
+  }
+  cupomAtivo=c;
+  msg.style.display='block';msg.style.color='var(--green-bright)';
+  msg.textContent='✓ Cupom '+c.nome+' aplicado! '+c.desconto+'% de desconto.';
+  document.getElementById('cart-cupom-input').disabled=true;
+  updSums();
 }
 function updCoResumo(){
   const sub=cart.itens.reduce((s,it)=>{const p=prods.find(x=>x.id===it.prodId);return s+(p?p.preco*it.qty:0)},0);
   const taxa=cart.entrega==='Entrega'?TAXA:0;
+  const desc=cupomAtivo?Math.round(sub*cupomAtivo.desconto/100*100)/100:0;
   document.getElementById('co-resumo').textContent=cart.itens.map(it=>{const p=prods.find(x=>x.id===it.prodId);return p?it.qty+'x '+p.nome:''}).filter(Boolean).join(', ');
-  document.getElementById('co-total').textContent='R$ '+fp(sub+taxa);
+  document.getElementById('co-total').textContent='R$ '+fp(sub+taxa-desc);
+  const tv=document.getElementById('co-taxa-val');
+  if(tv)tv.textContent=fp(taxa);
 }
 
 function buildTextoWhatsApp(pedido,itens){
@@ -1673,64 +1787,70 @@ function semTroco(){
 async function enviarPedido(){
   const nome=document.getElementById('co-nome').value.trim();
   const tel=document.getElementById('co-tel').value.trim();
-  const end=document.getElementById('co-end').value.trim();
+  const isRetirada=cart.entrega==='Retirada';
+  const endEntrega=document.getElementById('co-end').value.trim();
+  const endRetirada=document.getElementById('co-ret-local')?.value.trim()||'';
+  const end=isRetirada?endRetirada:endEntrega;
   const pag=document.getElementById('co-pag').value;
   const momento=document.getElementById('co-pag-momento').value;
   const troco=document.getElementById('co-troco').value;
-  const comp=document.getElementById('co-comp').value.trim();
+  const comp=isRetirada?'':document.getElementById('co-comp').value.trim();
   const erros=[];
   if(!nome) erros.push('Nome');
   if(!tel) erros.push('Contato');
-  if(!end) erros.push('Endereco');
+  if(!isRetirada&&!endEntrega) erros.push('Endereco');
+  if(isRetirada&&!endRetirada) erros.push('Local de retirada (selecione a data)');
   if(!pag) erros.push('Forma de pagamento');
-  // Validar troco se dinheiro
   if(pag==='Dinheiro'&&!troco){popAlert('💵','Troco obrigatório','Informe o valor para troco ou clique em "Não preciso de troco!"');return}
   if(erros.length){popAlert('⚠️','Campos obrigatórios','Preencha: '+erros.join(', '));return}
-  if(!document.getElementById('co-data').value){popAlert('📅','Data obrigatória','Selecione uma data de entrega.');return}
+  if(!document.getElementById('co-data').value){popAlert('📅','Data obrigatória','Selecione uma data.');return}
   if(!cart.itens.length){toast('Carrinho vazio.','err');return}
   const btn=document.getElementById('co-btn');
   btn.disabled=true;btn.textContent='Enviando...';
-
-  // Status automático: Pix = Pendente, entrega = Em preparo
   const statusAuto=momento==='agora'?'Pendente':'Em preparo';
-
   const itensCopy=[...cart.itens];
   const pagLabel=pag+(troco&&troco!=='sem troco'?' (troco p/ R$ '+fp(parseFloat(troco))+')':(troco==='sem troco'?' (sem troco)':''));
   const txtWpp=buildTextoWhatsApp({
     nome,contato:tel,endereco:end,
-    numero:document.getElementById('co-num').value,
+    numero:isRetirada?'':document.getElementById('co-num').value,
     complemento:comp,
     data:fd(document.getElementById('co-data').value),
     entrega:cart.entrega,pagamento:pagLabel,
     obs:document.getElementById('co-obs').value
   },itensCopy);
   abrirWhatsApp(txtWpp);
-
   try{
     const dataPed=document.getElementById('co-data').value;
     const codigo=await gerarCodigo(dataPed);
     const sub=itensCopy.reduce((s,it)=>{const p=prods.find(x=>x.id===it.prodId);return s+(p?p.preco*it.qty:0)},0);
     const taxa=cart.entrega==='Entrega'?TAXA:0;
+    const desc=cupomAtivo?Math.round(sub*cupomAtivo.desconto/100*100)/100:0;
     const insertData={
       user_id:perfil.id,cliente_nome:nome,
       cliente_contato:tel,
       cliente_endereco:end,
-      cliente_numero:document.getElementById('co-num').value,
+      cliente_numero:isRetirada?'':document.getElementById('co-num').value,
       cliente_complemento:comp||null,
       entrega:cart.entrega,taxa_entrega:taxa,
       pagamento:pagLabel,
       status:statusAuto,
       observacoes:document.getElementById('co-obs').value,
-      subtotal:sub,total:sub+taxa,
+      subtotal:sub,total:sub+taxa-desc,
       data_pedido:dataPed
     };
     if(codigo)insertData.codigo=codigo;
+    if(cupomAtivo)insertData.cupom=cupomAtivo.nome;
     const {data:ped,error}=await sb.from('pedidos').insert(insertData).select().single();
     if(error)throw error;
     await sb.from('itens_pedido').insert(itensCopy.map(it=>{
       const p=prods.find(x=>x.id===it.prodId);
       return{pedido_id:ped.id,produto_id:p.id,nome_produto:p.nome,peso_produto:p.peso||'',preco_unitario:p.preco,quantidade:it.qty,subtotal:p.preco*it.qty};
     }));
+    // Decrementa uso do cupom
+    if(cupomAtivo){
+      const novosUsos=Math.max(0,cupomAtivo.usos_restantes-1);
+      await sb.from('cupons').update({usos_restantes:novosUsos}).eq('id',cupomAtivo.id);
+    }
     // Decrementar estoque
     await Promise.all(itensCopy.map(it=>{
       const p=prods.find(x=>x.id===it.prodId);
@@ -1739,6 +1859,7 @@ async function enviarPedido(){
       p.estoque=novo;
       return sb.from('produtos').update({estoque:novo}).eq('id',p.id);
     }));
+    cupomAtivo=null;
     cart={itens:[],entrega:'Entrega'};updCartBadge();fecharCo();
     mostrarSucesso();
   }catch(e){toast('Erro: '+e.message,'err')}
@@ -1899,6 +2020,7 @@ function selecionarData(iso){
   btn.textContent=label;
   btn.classList.add('selected');
   fecharCal();
+  if(calCtx==='co'&&cart.entrega==='Retirada') renderRetOpts();
   if(calCtx==='entr')renderEntregas();
 }
 
@@ -2601,11 +2723,22 @@ async function renderCatList(){
 async function addCat(){
   const nome=document.getElementById('cat-nome').value.trim();
   if(!nome)return;
-  const {data,error}=await sb.from('categorias').insert({nome}).select().single();
+  let imagem_url=null;
+  const imgFile=document.getElementById('cat-img-file')?.files[0];
+  if(imgFile){
+    const ext=imgFile.name.split('.').pop();
+    const path='categorias/'+Date.now()+'.'+ext;
+    const {error:upErr}=await sb.storage.from('imagens').upload(path,imgFile,{upsert:true});
+    if(!upErr)imagem_url=IMG_BASE+'/'+path;
+  }
+  const {data,error}=await sb.from('categorias').insert({nome,imagem_url}).select().single();
   if(error){toast('Erro: '+error.message,'err');return}
   cats.push(data);
   document.getElementById('cat-nome').value='';
+  const cf=document.getElementById('cat-img-file');if(cf)cf.value='';
+  const cp=document.getElementById('cat-img-preview');if(cp)cp.innerHTML='🌿';
   renderCatList();renderCatSel();renderPPills();renderACpills();renderShopCats();
+  toast('Categoria adicionada!','ok');
 }
 
 async function rmCat(id){
@@ -2630,20 +2763,50 @@ async function addProd(){
   if(!nome||isNaN(preco)){toast('Informe nome e preço.','err');return}
   const estoqueVal=document.getElementById('p-estoque').value;
   const estoque=estoqueVal!==''?parseInt(estoqueVal):null;
+  // Upload imagem
+  let imagem_url=null;
+  const imgFile=document.getElementById('p-img-file')?.files[0];
+  if(imgFile){
+    const ext=imgFile.name.split('.').pop();
+    const path='produtos/'+Date.now()+'.'+ext;
+    const {error:upErr}=await sb.storage.from('imagens').upload(path,imgFile,{upsert:true});
+    if(!upErr)imagem_url=IMG_BASE+'/'+path;
+  }
   const {data,error}=await sb.from('produtos').insert({
     cat_id:parseInt(document.getElementById('p-cat').value),
     nome,
     descricao:document.getElementById('p-desc').value.trim(),
     peso:document.getElementById('p-peso').value.trim(),
-    emoji:document.getElementById('p-emoji').value.trim()||'\u{1F966}',
+    imagem_url,
     preco,estoque,ativo:true
   }).select().single();
   if(error){toast('Erro: '+error.message,'err');return}
   prods.push(data);
-  ['p-nome','p-desc','p-peso','p-preco','p-emoji','p-estoque'].forEach(id=>{
+  ['p-nome','p-desc','p-peso','p-preco','p-estoque'].forEach(id=>{
     const el=document.getElementById(id);if(el)el.value='';
   });
+  const pf=document.getElementById('p-img-file');if(pf)pf.value='';
+  const pp=document.getElementById('p-img-preview');if(pp)pp.innerHTML='🥦';
   renderProdList();renderAGrid();renderShop();
+  toast('Produto adicionado!','ok');
+}
+function previewProdImg(input){
+  const f=input.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=e=>{
+    const prev=document.getElementById('p-img-preview');
+    if(prev)prev.innerHTML=`<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover">`;
+  };
+  r.readAsDataURL(f);
+}
+function previewCatImg(input){
+  const f=input.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=e=>{
+    const prev=document.getElementById('cat-img-preview');
+    if(prev)prev.innerHTML=`<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover">`;
+  };
+  r.readAsDataURL(f);
 }
 
 function renderPPills(){
@@ -2900,7 +3063,7 @@ init();
 document.body.insertAdjacentHTML('beforeend',`<div id="mobile-cart-bar" class="mobile-cart-bar">
   <div><div id="mbar-total" style="font-size:16px;font-weight:800;color:var(--green-bright)">R$ 0,00</div>
   <div id="mbar-count" style="font-size:11px;color:var(--text2)">0 items</div></div>
-  <button class="btn btn-g" style="padding:10px 20px;font-size:14px;font-weight:700" onclick="irCheckout()">Ver sacola ›</button>
+  <button class="btn btn-g" style="padding:10px 20px;font-size:14px;font-weight:700" onclick="abrirCart()">Ver sacola ›</button>
 </div>`);
 </script>
 </body>
