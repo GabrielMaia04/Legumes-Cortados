@@ -2389,7 +2389,7 @@ function imprimirTodosPedidos(){
     <div class="obs"><span class="lbl">OBSERVAÇÃO: </span><span class="val">${p.observacoes||''}</span></div>
     <hr class="sep">
     <div class="footer">Seu pedido foi preparado com cuidado!</div>
-    <scr'+'ipt>window.onload=function(){window.print();setTimeout(()=>window.close(),1500)}<\/script>
+    \x3cscript\x3ewindow.onload=function(){window.print();setTimeout(()=>window.close(),1500)}\x3c/script\x3e
     </body></html>`;
       const blob=new Blob([_html],{type:'text/html'});
       const url=URL.createObjectURL(blob);
@@ -2444,7 +2444,7 @@ function imprimirEntregas(){
   </div>
   ${consLines}
   <div class="footer"><span>TOTAL GERAL</span><span>${total} un</span></div>
-  <scr'+'ipt>window.onload=function(){window.print();}<\/scr'+'ipt>
+  \x3cscript\x3ewindow.onload=function(){window.print();}\x3c/script\x3e
   </body></html>`;
   const blob=new Blob([html],{type:'text/html'});
   const url=URL.createObjectURL(blob);
@@ -2657,7 +2657,7 @@ function imprimirPedido(id){
     <div class="obs"><span class="lbl">OBSERVAÇÃO: </span><span class="val">${p.observacoes||''}</span></div>
     <hr class="sep">
     <div class="footer">Seu pedido foi preparado com cuidado!</div>
-    <scr'+'ipt>window.onload=function(){window.print();}<\/scr'+'ipt>
+    \x3cscript\x3ewindow.onload=function(){window.print();}\x3c/script\x3e
     </body></html>`;
   const blob=new Blob([_html],{type:'text/html'});
   const url=URL.createObjectURL(blob);
