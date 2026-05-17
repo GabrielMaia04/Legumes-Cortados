@@ -1779,7 +1779,8 @@ async function gerarCodigo(dataPedido){
 }
 
 function abrirWhatsApp(texto){
-  const url='https://wa.me/'+WHATSAPP_NUM+'?text='+encodeURIComponent(texto);
+  const num=window._WHATSAPP_NUM_DB||WHATSAPP_NUM;
+  const url='https://wa.me/'+num+'?text='+encodeURIComponent(texto);
   window.open(url,'_blank');
 }
 /* ── PAGAMENTO CHECKOUT ── */
